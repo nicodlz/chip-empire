@@ -1,20 +1,81 @@
+import { useEffect } from 'react'
+import { useGameStore, startTicker } from './store/gameStore'
 import { MineralDisplay } from './components/MineralDisplay'
 import { MineArea } from './components/MineArea'
+import { TabNav } from './components/TabNav'
+import { FabPanel } from './components/FabPanel'
+import { ChipsPanel } from './components/ChipsPanel'
+import { formatFlops } from './engine/fabrication'
+
+function MineTab() {
+  return (
+    <>
+      <MineralDisplay />
+      <MineArea />
+    </>
+  )
+}
+
+function ResearchTab() {
+  return (
+    <div className="text-center py-12 text-slate-500">
+      <div className="text-4xl mb-3">🔬</div>
+      <p>Research lab under construction.</p>
+      <p className="text-sm">Coming in Phase 3!</p>
+    </div>
+  )
+}
+
+function FlopsCounter() {
+  const totalFlops = useGameStore((s) => s.totalFlops)
+  const flopsPerSecond = useGameStore((s) => s.flopsPerSecond)
+  
+  if (flopsPerSecond.eq(0)) return null
+  
+  return (
+    <div className="text-center py-2 px-4 bg-slate-900/50 rounded-lg border border-slate-800/30">
+      <div className="text-xs text-slate-400">COMPUTE</div>
+      <div className="font-mono text-[--neon-green] font-bold">
+        {formatFlops(totalFlops)}
+      </div>
+      <div className="text-xs text-slate-500">
+        +{formatFlops(flopsPerSecond)}/s
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
+  const activeTab = useGameStore((s) => s.activeTab)
+  
+  // Start the game ticker
+  useEffect(() => {
+    startTicker()
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col">
       {/* Header */}
       <header className="p-4 border-b border-slate-800/50 backdrop-blur-sm sticky top-0 z-10 bg-slate-950/80">
-        <h1 className="text-xl font-bold text-center tracking-wider">
-          <span className="text-[--neon-blue]">⚡</span> CHIP EMPIRE
-        </h1>
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          <h1 className="text-xl font-bold tracking-wider">
+            <span className="text-[--neon-blue]">⚡</span> CHIP EMPIRE
+          </h1>
+          <FlopsCounter />
+        </div>
       </header>
+
+      {/* Tab Navigation */}
+      <div className="p-4 max-w-lg mx-auto w-full">
+        <TabNav />
+      </div>
 
       {/* Main content */}
       <main className="flex-1 flex flex-col p-4 gap-6 max-w-lg mx-auto w-full">
-        <MineralDisplay />
-        <MineArea />
+        {activeTab === 'mine' && <MineTab />}
+        {activeTab === 'fab' && <FabPanel />}
+        {activeTab === 'chips' && <ChipsPanel />}
+        {activeTab === 'research' && <ResearchTab />}
       </main>
 
       {/* Footer */}

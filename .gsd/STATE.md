@@ -4,49 +4,44 @@
 
 See: .gsd/PROJECT.md (updated 2025-02-12)
 
-**Core value:** Le loop addictif "un clic de plus"
-**Current focus:** Phase 1 - Foundation
+**Core value:** La satisfaction de la progression technologique
+**Current focus:** Phase 2 - Fabrication
 
 ## Current Position
 
-Phase: 1 of 5 (Foundation)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2025-02-12 — Research complete, roadmap created
+Phase: 1 of 5 (Foundation) ✓ COMPLETE
+Plan: 3/3 complete
+Status: Ready for Phase 2
+Last activity: 2025-02-12 — Phase 1 executed
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
-**Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: 0h
+**Phase 1:**
+- Plans completed: 3
+- Build: SUCCESS
+- Commit: 2997fff
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
+- Stack: React 19 + Vite 7 + Zustand 5 + Tailwind 4
+- 14 real minerals (Si, Cu, Al, Au, Li, Co, Nd, Hf...)
+- Tier system 1-5 for progression
+- Neon accents on dark theme
+- Mobile-first touch handling
 
-Recent decisions:
-- Research: React 19 + Vite 7 + Zustand 5 + break_eternity.js
-- Architecture: 10 ticks/sec game loop, Engine/Store/UI separation
-- Mobile-first: Large tap targets, no hover states
+### Next Phase
 
-### Pending Todos
-
-None yet.
-
-### Blockers/Concerns
-
-None yet.
+Phase 2: Fabrication
+- Combine minerals → Wafers → Chips
+- 90nm process starter
+- Save/load system
+- Tier 2 minerals unlock
 
 ## Session Continuity
 
-Last session: 2025-02-12 23:35
-Stopped at: Research complete, ready to plan Phase 1
-Resume file: None
-
----
-*Keep under 100 lines — this is a digest, not an archive*
+Last session: 2025-02-12 23:50
+Stopped at: Phase 1 complete, ready for Phase 2
