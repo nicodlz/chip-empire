@@ -4,3 +4,6 @@ export type {
   WaferDef, ChipDef, ProcessNodeDef,
   WaferState, ChipState, FabState, CraftingJob,
 } from './fabrication'
+export type {
+  ResearchCategory, ResearchId, ResearchDef, ResearchEffect, ResearchState,
+} from './research'

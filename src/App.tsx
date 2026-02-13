@@ -5,6 +5,7 @@ import { MineArea } from './components/MineArea'
 import { TabNav } from './components/TabNav'
 import { FabPanel } from './components/FabPanel'
 import { ChipsPanel } from './components/ChipsPanel'
+import { ResearchPanel } from './components/ResearchPanel'
 import { formatFlops } from './engine/fabrication'
 
 function MineTab() {
@@ -13,16 +14,6 @@ function MineTab() {
       <MineralDisplay />
       <MineArea />
     </>
-  )
-}
-
-function ResearchTab() {
-  return (
-    <div className="text-center py-12 text-slate-500">
-      <div className="text-4xl mb-3">🔬</div>
-      <p>Research lab under construction.</p>
-      <p className="text-sm">Coming in Phase 3!</p>
-    </div>
   )
 }
 
@@ -75,7 +66,7 @@ export default function App() {
         {activeTab === 'mine' && <MineTab />}
         {activeTab === 'fab' && <FabPanel />}
         {activeTab === 'chips' && <ChipsPanel />}
-        {activeTab === 'research' && <ResearchTab />}
+        {activeTab === 'research' && <ResearchPanel />}
       </main>
 
       {/* Footer */}

@@ -3,19 +3,27 @@ import { persist } from 'zustand/middleware'
 import type { StorageValue } from 'zustand/middleware'
 import Decimal from 'break_eternity.js'
 import type { GameState, MineralId, MineralState } from '../types/game'
-import type { WaferId, ChipId, WaferState, ChipState, ProcessNode, FabState } from '../types/fabrication'
+import type { WaferId, ChipId, WaferState, ChipState, FabState } from '../types/fabrication'
+import type { ResearchId, ResearchState } from '../types/research'
 import { createMineralState, addMineral, mineMineral } from '../engine/resources'
 import { 
   createWaferState, createChipState, addWafer, addChip,
   canCraftWafer, canCraftChip, deductWaferCosts, deductChipCosts,
   calculateFlopsPerSecond, isCraftingComplete,
 } from '../engine/fabrication'
-import { MINERALS, TIER_1_MINERALS } from '../data/minerals'
+import { MINERALS, TIER_1_MINERALS, MINERAL_ORDER } from '../data/minerals'
 import { WAFERS, WAFER_ORDER } from '../data/wafers'
 import { CHIPS, STARTER_CHIPS, CHIP_ORDER } from '../data/chips'
-import { PROCESS_NODES, NODE_ORDER } from '../data/nodes'
+import { PROCESS_NODES } from '../data/nodes'
+import { RESEARCH } from '../data/research'
 
 interface FullGameState extends GameState, FabState {
+  // Research state
+  research: ResearchState
+  // Multipliers from research
+  miningMultiplier: number
+  fabSpeedMultiplier: number
+  flopsMultiplier: number
   // Tab state
   activeTab: 'mine' | 'fab' | 'chips' | 'research'
 }
@@ -31,8 +39,9 @@ interface GameStore extends FullGameState {
   completeCrafting: () => void
   cancelCrafting: () => void
   
-  // Node progression
-  unlockNode: (node: ProcessNode) => void
+  // Research actions
+  buyResearch: (researchId: ResearchId) => void
+  canBuyResearch: (researchId: ResearchId) => boolean
   
   // FLOPS generation
   tick: () => void
@@ -72,6 +81,15 @@ const createInitialState = (): FullGameState => ({
   // Fab state
   ...createInitialFabState(),
   
+  // Research state
+  research: {
+    completed: [],
+    totalSpent: new Decimal(0),
+  },
+  miningMultiplier: 1,
+  fabSpeedMultiplier: 1,
+  flopsMultiplier: 1,
+  
   // UI state
   activeTab: 'mine',
 })
@@ -93,7 +111,8 @@ export const useGameStore = create<GameStore>()(
         const mineral = state.minerals[mineralId]
         if (!mineral.unlocked) return state
         
-        const gained = mineMineral(mineralId, state.miningPower)
+        const baseGain = mineMineral(mineralId, state.miningPower)
+        const gained = baseGain.mul(state.miningMultiplier)
         return {
           minerals: {
             ...state.minerals,
@@ -111,14 +130,12 @@ export const useGameStore = create<GameStore>()(
 
       // === FABRICATION ===
       startCraftWafer: (waferId, amount = 1) => set((state) => {
-        // Can't start if already crafting
         if (state.crafting) return state
-        
-        // Check resources
         if (!canCraftWafer(waferId, state.minerals, amount)) return state
         
         const wafer = WAFERS[waferId]
         const newMinerals = deductWaferCosts(waferId, state.minerals, amount)
+        const adjustedDuration = (wafer.craftTime * amount) / state.fabSpeedMultiplier
         
         return {
           minerals: newMinerals as Record<MineralId, MineralState>,
@@ -126,7 +143,7 @@ export const useGameStore = create<GameStore>()(
             type: 'wafer',
             itemId: waferId,
             startedAt: Date.now(),
-            duration: wafer.craftTime * amount,
+            duration: adjustedDuration,
             amount,
           },
         }
@@ -138,6 +155,7 @@ export const useGameStore = create<GameStore>()(
         
         const chip = CHIPS[chipId]
         const { minerals, wafers } = deductChipCosts(chipId, state.minerals, state.wafers, amount)
+        const adjustedDuration = (chip.craftTime * amount) / state.fabSpeedMultiplier
         
         return {
           minerals: minerals as Record<MineralId, MineralState>,
@@ -146,7 +164,7 @@ export const useGameStore = create<GameStore>()(
             type: 'chip',
             itemId: chipId,
             startedAt: Date.now(),
-            duration: chip.craftTime * amount,
+            duration: adjustedDuration,
             amount,
           },
         }
@@ -165,10 +183,9 @@ export const useGameStore = create<GameStore>()(
           }
         } else {
           const chipState = addChip(state.chips[itemId as ChipId], amount)
-          // Recalculate FLOPS
           const newChips = { ...state.chips, [itemId]: chipState }
           const efficiency = PROCESS_NODES[state.currentNode].efficiency
-          const flopsPerSecond = calculateFlopsPerSecond(newChips, efficiency)
+          const flopsPerSecond = calculateFlopsPerSecond(newChips, efficiency).mul(state.flopsMultiplier)
           
           return {
             chips: newChips,
@@ -180,53 +197,126 @@ export const useGameStore = create<GameStore>()(
 
       cancelCrafting: () => set({ crafting: null }),
 
-      // === NODE PROGRESSION ===
-      unlockNode: (node) => set((state) => {
-        const nodeDef = PROCESS_NODES[node]
-        if (!nodeDef) return state
-        if (state.unlockedNodes.includes(node)) return state
-        if (state.totalFlops.lt(nodeDef.unlockCost.flops)) return state
+      // === RESEARCH ===
+      canBuyResearch: (researchId) => {
+        const state = get()
+        const research = RESEARCH[researchId]
+        if (!research) return false
         
-        // Must unlock in order
-        const nodeIndex = NODE_ORDER.indexOf(node)
-        if (nodeIndex > 0 && !state.unlockedNodes.includes(NODE_ORDER[nodeIndex - 1])) {
-          return state
+        // Already completed?
+        if (state.research.completed.includes(researchId)) return false
+        
+        // Check prerequisites
+        if (research.requires) {
+          for (const reqId of research.requires) {
+            if (!state.research.completed.includes(reqId)) return false
+          }
         }
         
-        // Spend FLOPS and unlock
-        const newUnlocked = [...state.unlockedNodes, node]
+        // Check cost
+        return state.totalFlops.gte(research.cost)
+      },
+
+      buyResearch: (researchId) => set((state) => {
+        const research = RESEARCH[researchId]
+        if (!research) return state
+        if (state.research.completed.includes(researchId)) return state
+        if (!get().canBuyResearch(researchId)) return state
         
-        // Also unlock new wafers and chips
-        const newWafers = { ...state.wafers }
-        const newChips = { ...state.chips }
+        // Deduct FLOPS
+        const newTotalFlops = state.totalFlops.sub(research.cost)
+        const newCompleted = [...state.research.completed, researchId]
+        const newTotalSpent = state.research.totalSpent.add(research.cost)
         
-        for (const waferId of nodeDef.unlocksWafers) {
-          newWafers[waferId] = { ...newWafers[waferId], unlocked: true }
-        }
-        for (const chipId of nodeDef.unlocksChips) {
-          newChips[chipId] = { ...newChips[chipId], unlocked: true }
+        // Apply effects
+        let newState: Partial<FullGameState> = {
+          totalFlops: newTotalFlops,
+          research: {
+            completed: newCompleted,
+            totalSpent: newTotalSpent,
+          },
         }
         
-        return {
-          totalFlops: state.totalFlops.sub(nodeDef.unlockCost.flops),
-          unlockedNodes: newUnlocked,
-          currentNode: node,
-          wafers: newWafers,
-          chips: newChips,
+        for (const effect of research.effects) {
+          switch (effect.type) {
+            case 'unlock_node': {
+              const node = effect.node
+              if (!state.unlockedNodes.includes(node)) {
+                const nodeDef = PROCESS_NODES[node]
+                const newWafers = { ...(newState.wafers || state.wafers) }
+                const newChips = { ...(newState.chips || state.chips) }
+                
+                for (const waferId of nodeDef.unlocksWafers) {
+                  newWafers[waferId] = { ...newWafers[waferId], unlocked: true }
+                }
+                for (const chipId of nodeDef.unlocksChips) {
+                  newChips[chipId] = { ...newChips[chipId], unlocked: true }
+                }
+                
+                newState = {
+                  ...newState,
+                  unlockedNodes: [...state.unlockedNodes, node],
+                  currentNode: node,
+                  wafers: newWafers,
+                  chips: newChips,
+                }
+              }
+              break
+            }
+            case 'unlock_minerals': {
+              const tier = effect.tier
+              const newMinerals = { ...(newState.minerals || state.minerals) }
+              for (const mineralId of MINERAL_ORDER) {
+                if (MINERALS[mineralId].tier === tier) {
+                  newMinerals[mineralId] = { ...newMinerals[mineralId], unlocked: true }
+                }
+              }
+              newState = { ...newState, minerals: newMinerals }
+              break
+            }
+            case 'mining_multiplier': {
+              newState = {
+                ...newState,
+                miningMultiplier: (newState.miningMultiplier || state.miningMultiplier) * effect.value,
+              }
+              break
+            }
+            case 'fab_speed_multiplier': {
+              newState = {
+                ...newState,
+                fabSpeedMultiplier: (newState.fabSpeedMultiplier || state.fabSpeedMultiplier) * effect.value,
+              }
+              break
+            }
+            case 'flops_multiplier': {
+              const newMultiplier = (newState.flopsMultiplier || state.flopsMultiplier) * effect.value
+              // Recalculate FLOPS per second
+              const efficiency = PROCESS_NODES[newState.currentNode || state.currentNode].efficiency
+              const baseFlops = calculateFlopsPerSecond(newState.chips || state.chips, efficiency)
+              newState = {
+                ...newState,
+                flopsMultiplier: newMultiplier,
+                flopsPerSecond: baseFlops.mul(newMultiplier),
+              }
+              break
+            }
+          }
         }
+        
+        return newState
       }),
 
       // === FLOPS GENERATION ===
       tick: () => set((state) => {
         const now = Date.now()
-        const delta = (now - state.lastTick) / 1000 // seconds
+        const delta = (now - state.lastTick) / 1000
         
-        if (delta < 0.1) return state // Don't tick too fast
+        if (delta < 0.1) return state
         
         // Auto-complete crafting
         if (state.crafting && isCraftingComplete(state.crafting)) {
           get().completeCrafting()
-          return get() // Return fresh state after completion
+          return get()
         }
         
         // Generate FLOPS
@@ -245,7 +335,7 @@ export const useGameStore = create<GameStore>()(
       reset: () => set(createInitialState()),
     }),
     {
-      name: 'chip-empire-save-v2',
+      name: 'chip-empire-save-v3',
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name)
