@@ -14,7 +14,7 @@ export function TabNav() {
   const totalFlops = useGameStore((s) => s.totalFlops)
   const autoMiningUnlocked = useGameStore((s) => s.autoMiningUnlocked)
   const hasChips = useGameStore((s) => 
-    Object.values(s.chips).some(c => c.amount.gt(0))
+    Object.values(s.chips).some(c => c?.amount?.gt?.(0))
   )
   const hasUnlockedFab = useGameStore((s) => 
     s.minerals.silicon.total.gte(50)

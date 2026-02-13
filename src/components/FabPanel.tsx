@@ -8,6 +8,7 @@ import type { WaferId, ChipId } from '../types/fabrication'
 import type { MineralId } from '../types/game'
 
 function formatCost(cost: number, have: number): string {
+  if (have == null || isNaN(have)) return `0/${cost}`
   if (have >= cost) return `${cost}`
   return `${Math.floor(have)}/${cost}`
 }
@@ -57,7 +58,9 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
       <div className="flex flex-wrap gap-2">
         {Object.entries(wafer.recipe).map(([mineralId, cost]) => {
           const mineral = MINERALS[mineralId as MineralId]
-          const have = minerals[mineralId as MineralId].amount.toNumber()
+          const mineralState = minerals[mineralId as MineralId]
+          if (!mineral || !mineralState) return null
+          const have = mineralState.amount?.toNumber() ?? 0
           const enough = have >= cost
           return (
             <span
@@ -84,10 +87,13 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
   const crafting = useGameStore((s) => s.crafting)
   const startCraftChip = useGameStore((s) => s.startCraftChip)
 
-  if (!chipState.unlocked) return null
+  if (!chipState?.unlocked) return null
 
   const canCraft = !crafting && canCraftChip(chipId, minerals, wafers, currentNode)
-  const waferState = wafers[chip.waferCost.type]
+  const waferState = wafers[chip.waferCost?.type]
+  
+  // Safety check
+  if (!waferState) return null
 
   return (
     <div className={`
@@ -125,20 +131,22 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
       <div className="flex flex-wrap gap-2">
         {/* Wafer cost */}
         <span className={`text-xs px-2 py-1 rounded-full ${
-          waferState.amount.gte(chip.waferCost.amount) 
+          waferState.amount?.gte?.(chip.waferCost.amount) 
             ? 'bg-blue-500/20 text-blue-400' 
             : 'bg-red-500/20 text-red-400'
         }`}>
-          {WAFERS[chip.waferCost.type].emoji} {formatCost(
+          {WAFERS[chip.waferCost.type]?.emoji ?? '?'} {formatCost(
             chip.waferCost.amount, 
-            waferState.amount.toNumber()
+            waferState.amount?.toNumber?.() ?? 0
           )}
         </span>
         
         {/* Extra mineral costs */}
         {chip.extraCosts && Object.entries(chip.extraCosts).map(([mineralId, cost]) => {
           const mineral = MINERALS[mineralId as MineralId]
-          const have = minerals[mineralId as MineralId].amount.toNumber()
+          const mineralState = minerals[mineralId as MineralId]
+          if (!mineral || !mineralState) return null
+          const have = mineralState.amount?.toNumber?.() ?? 0
           return (
             <span
               key={mineralId}

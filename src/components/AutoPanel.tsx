@@ -4,8 +4,10 @@ import { MINERALS } from '../data/minerals'
 import type { AutoMinerId } from '../types/automation'
 import Decimal from 'break_eternity.js'
 
-function formatNumber(n: Decimal | number): string {
+function formatNumber(n: Decimal | number | null | undefined): string {
+  if (n == null) return '0'
   const num = n instanceof Decimal ? n.toNumber() : n
+  if (isNaN(num)) return '0'
   if (num < 1000) return num.toFixed(0)
   if (num < 1e6) return `${(num / 1000).toFixed(1)}K`
   if (num < 1e9) return `${(num / 1e6).toFixed(2)}M`
@@ -21,7 +23,7 @@ function AutoMinerCard({ minerId }: { minerId: AutoMinerId }) {
   const buyAutoMiner = useGameStore((s) => s.buyAutoMiner)
   const miningMultiplier = useGameStore((s) => s.miningMultiplier)
   
-  if (!minerState.unlocked) return null
+  if (!minerState?.unlocked) return null
   
   const cost = getCost(minerId)
   const productionPerSec = def.ratePerSecond * minerState.owned * miningMultiplier
