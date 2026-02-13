@@ -191,11 +191,12 @@ export const useGameStore = create<GameStore>()(
       // === FABRICATION ===
       startCraftWafer: (waferId, amount = 1) => set((state) => {
         if (state.crafting) return state
+        const wafer = WAFERS[waferId]
+        if (!wafer) return state
         if (!canCraftWafer(waferId, state.minerals, amount)) return state
         
-        const wafer = WAFERS[waferId]
         const newMinerals = deductWaferCosts(waferId, state.minerals, amount)
-        const adjustedDuration = (wafer.craftTime * amount) / state.fabSpeedMultiplier
+        const adjustedDuration = (wafer.craftTime * amount) / (state.fabSpeedMultiplier ?? 1)
         
         return {
           minerals: newMinerals as Record<MineralId, MineralState>,
@@ -211,11 +212,12 @@ export const useGameStore = create<GameStore>()(
 
       startCraftChip: (chipId, amount = 1) => set((state) => {
         if (state.crafting) return state
+        const chip = CHIPS[chipId]
+        if (!chip) return state
         if (!canCraftChip(chipId, state.minerals, state.wafers, state.currentNode, amount)) return state
         
-        const chip = CHIPS[chipId]
         const { minerals, wafers } = deductChipCosts(chipId, state.minerals, state.wafers, amount)
-        const adjustedDuration = (chip.craftTime * amount) / state.fabSpeedMultiplier
+        const adjustedDuration = (chip.craftTime * amount) / (state.fabSpeedMultiplier ?? 1)
         
         return {
           minerals: minerals as Record<MineralId, MineralState>,
@@ -236,16 +238,21 @@ export const useGameStore = create<GameStore>()(
         const { type, itemId, amount } = state.crafting
         
         if (type === 'wafer') {
-          const waferState = addWafer(state.wafers[itemId as WaferId], amount)
+          const currentWafer = state.wafers?.[itemId as WaferId]
+          if (!currentWafer) return { crafting: null }
+          const waferState = addWafer(currentWafer, amount)
           return {
             wafers: { ...state.wafers, [itemId]: waferState },
             crafting: null,
           }
         } else {
-          const chipState = addChip(state.chips[itemId as ChipId], amount)
+          const currentChip = state.chips?.[itemId as ChipId]
+          if (!currentChip) return { crafting: null }
+          const chipState = addChip(currentChip, amount)
           const newChips = { ...state.chips, [itemId]: chipState }
-          const efficiency = PROCESS_NODES[state.currentNode].efficiency
-          const flopsPerSecond = calculateFlopsPerSecond(newChips, efficiency).mul(state.flopsMultiplier)
+          const nodeDef = PROCESS_NODES[state.currentNode]
+          const efficiency = nodeDef?.efficiency ?? 1
+          const flopsPerSecond = calculateFlopsPerSecond(newChips, efficiency).mul(state.flopsMultiplier ?? 1)
           
           return {
             chips: newChips,
@@ -290,16 +297,21 @@ export const useGameStore = create<GameStore>()(
           switch (effect.type) {
             case 'unlock_node': {
               const node = effect.node
+              const nodeDef = PROCESS_NODES[node]
+              if (!nodeDef) break
               if (!state.unlockedNodes.includes(node)) {
-                const nodeDef = PROCESS_NODES[node]
                 const newWafers = { ...(newState.wafers || state.wafers) }
                 const newChips = { ...(newState.chips || state.chips) }
                 
-                for (const waferId of nodeDef.unlocksWafers) {
-                  newWafers[waferId] = { ...newWafers[waferId], unlocked: true }
+                for (const waferId of nodeDef.unlocksWafers ?? []) {
+                  if (newWafers[waferId]) {
+                    newWafers[waferId] = { ...newWafers[waferId], unlocked: true }
+                  }
                 }
-                for (const chipId of nodeDef.unlocksChips) {
-                  newChips[chipId] = { ...newChips[chipId], unlocked: true }
+                for (const chipId of nodeDef.unlocksChips ?? []) {
+                  if (newChips[chipId]) {
+                    newChips[chipId] = { ...newChips[chipId], unlocked: true }
+                  }
                 }
                 
                 newState = {
@@ -338,8 +350,10 @@ export const useGameStore = create<GameStore>()(
               break
             }
             case 'flops_multiplier': {
-              const newMultiplier = (newState.flopsMultiplier || state.flopsMultiplier) * effect.value
-              const efficiency = PROCESS_NODES[newState.currentNode || state.currentNode].efficiency
+              const newMultiplier = ((newState.flopsMultiplier ?? state.flopsMultiplier) ?? 1) * effect.value
+              const currentNode = newState.currentNode || state.currentNode
+              const nodeDef = PROCESS_NODES[currentNode]
+              const efficiency = nodeDef?.efficiency ?? 1
               const baseFlops = calculateFlopsPerSecond(newState.chips || state.chips, efficiency)
               newState = {
                 ...newState,
