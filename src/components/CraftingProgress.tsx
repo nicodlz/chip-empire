@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useGameStore } from '../store/gameStore'
-import { getCraftingProgress } from '../engine/fabrication'
-import { WAFERS } from '../data/wafers'
-import { CHIPS } from '../data/chips'
-import type { QueuedCraft } from '../types/fabrication'
+import { useGameStore } from '@/store/gameStore'
+import { getCraftingProgress } from '@/engine/fabrication'
+import { WAFERS } from '@/data/wafers'
+import { CHIPS } from '@/data/chips'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import type { QueuedCraft } from '@/types/fabrication'
 
 function getItemDef(type: 'wafer' | 'chip', itemId: string) {
   return type === 'wafer'
@@ -14,25 +18,22 @@ function getItemDef(type: 'wafer' | 'chip', itemId: string) {
 function QueueItem({ item, onCancel }: { item: QueuedCraft; onCancel: () => void }) {
   const def = getItemDef(item.type, item.itemId)
   if (!def) return null
-  
+
   return (
-    <div className="flex items-center justify-between py-2 px-3 bg-slate-800/30 rounded-lg">
+    <div className="flex items-center justify-between py-1.5 px-2 bg-muted/50 rounded">
       <div className="flex items-center gap-2">
-        <span className="text-lg">{def.emoji}</span>
-        <span className="text-sm text-slate-300">
+        <span className="text-base">{def.emoji}</span>
+        <span className="text-sm">
           {def.name}
-          {item.amount > 1 && <span className="text-slate-500"> ×{item.amount}</span>}
+          {item.amount > 1 && <span className="text-muted-foreground"> ×{item.amount}</span>}
         </span>
-        <span className="text-xs text-slate-500">
-          ({(item.duration / 1000).toFixed(1)}s)
-        </span>
+        <Badge variant="outline" className="text-[10px] px-1.5">
+          {(item.duration / 1000).toFixed(1)}s
+        </Badge>
       </div>
-      <button
-        onClick={onCancel}
-        className="text-red-400/60 hover:text-red-400 text-xs px-2 py-1"
-      >
+      <Button variant="ghost" size="sm" onClick={onCancel} className="h-6 w-6 p-0 text-destructive">
         ✕
-      </button>
+      </Button>
     </div>
   )
 }
@@ -58,10 +59,18 @@ export function CraftingProgress() {
     return () => clearInterval(interval)
   }, [crafting])
 
-  if (!crafting && craftingQueue.length === 0) return null
+  // Empty state placeholder to maintain height
+  if (!crafting && craftingQueue.length === 0) {
+    return (
+      <Card className="bg-muted/30 border-dashed">
+        <CardContent className="p-4 text-center text-muted-foreground text-sm">
+          Select a wafer or chip to craft
+        </CardContent>
+      </Card>
+    )
+  }
 
   const item = crafting ? getItemDef(crafting.type, crafting.itemId) : null
-  
   const remainingMs = crafting ? Math.max(0, (crafting.startedAt + crafting.duration) - Date.now()) : 0
   const remainingSec = (remainingMs / 1000).toFixed(1)
 
@@ -69,54 +78,48 @@ export function CraftingProgress() {
     <div className="space-y-2">
       {/* Current crafting */}
       {crafting && item && (
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{item.emoji}</span>
-              <div>
-                <div className="font-medium text-white">
-                  Crafting {item.name}
-                  {crafting.amount > 1 && <span className="text-slate-400"> ×{crafting.amount}</span>}
-                </div>
-                <div className="text-xs text-slate-400">
-                  {remainingSec}s remaining
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{item.emoji}</span>
+                <div>
+                  <div className="font-medium">
+                    Crafting {item.name}
+                    {crafting.amount > 1 && <span className="text-muted-foreground"> ×{crafting.amount}</span>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {remainingSec}s remaining
+                  </div>
                 </div>
               </div>
+              <Button variant="destructive" size="sm" onClick={cancelCrafting}>
+                Cancel
+              </Button>
             </div>
-            <button
-              onClick={cancelCrafting}
-              className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-500/10"
-            >
-              Cancel
-            </button>
-          </div>
-          
-          {/* Progress bar */}
-          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-[--neon-blue] to-[--neon-purple] transition-all duration-100"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+            <Progress value={progress} className="h-2" />
+          </CardContent>
+        </Card>
       )}
-      
+
       {/* Queue */}
       {autoFabUnlocked && craftingQueue.length > 0 && (
-        <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700/30">
-          <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
-            <span>📋</span> Queue ({craftingQueue.length})
-          </div>
-          <div className="space-y-1">
-            {craftingQueue.map((qItem) => (
-              <QueueItem 
-                key={qItem.id} 
-                item={qItem} 
-                onCancel={() => cancelQueueItem(qItem.id)} 
-              />
-            ))}
-          </div>
-        </div>
+        <Card className="bg-muted/30">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+              📋 Queue ({craftingQueue.length})
+            </div>
+            <div className="space-y-1">
+              {craftingQueue.map((qItem) => (
+                <QueueItem
+                  key={qItem.id}
+                  item={qItem}
+                  onCancel={() => cancelQueueItem(qItem.id)}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

@@ -1,25 +1,29 @@
-import { useGameStore } from '../store/gameStore'
-import { canCraftWafer, canCraftChip } from '../engine/fabrication'
-import { WAFERS, WAFER_ORDER } from '../data/wafers'
-import { CHIPS, CHIP_ORDER } from '../data/chips'
-import { MINERALS } from '../data/minerals'
+import { useGameStore } from '@/store/gameStore'
+import { canCraftWafer, canCraftChip } from '@/engine/fabrication'
+import { WAFERS, WAFER_ORDER } from '@/data/wafers'
+import { CHIPS, CHIP_ORDER } from '@/data/chips'
+import { MINERALS } from '@/data/minerals'
 import { CraftingProgress } from './CraftingProgress'
-import type { WaferId, ChipId } from '../types/fabrication'
-import type { MineralId } from '../types/game'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import type { WaferId, ChipId } from '@/types/fabrication'
+import type { MineralId } from '@/types/game'
 
-// Safe number formatting
-function formatCost(cost: number, have: number | undefined): string {
-  const h = have ?? 0
-  if (h >= cost) return `${cost}`
-  return `${Math.floor(h)}/${cost}`
-}
-
-// Safe Decimal to number
 function safeToNumber(val: unknown): number {
   if (val && typeof (val as any).toNumber === 'function') {
     return (val as any).toNumber()
   }
   return 0
+}
+
+function ResourceBadge({ emoji, have, need }: { emoji: string; have: number; need: number }) {
+  const enough = have >= need
+  return (
+    <Badge variant={enough ? 'secondary' : 'destructive'} className="text-xs gap-1">
+      {emoji} {Math.floor(have)}/{need}
+    </Badge>
+  )
 }
 
 function WaferCard({ waferId }: { waferId: WaferId }) {
@@ -30,63 +34,45 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
   const autoFabUnlocked = useGameStore((s) => s.autoFabUnlocked)
   const startCraftWafer = useGameStore((s) => s.startCraftWafer)
 
-  // Skip if no wafer data
-  if (!wafer || !waferState) return null
-  if (!waferState.unlocked) return null
+  if (!wafer || !waferState?.unlocked) return null
 
   const hasResources = canCraftWafer(waferId, minerals)
   const canCraft = hasResources && (!crafting || autoFabUnlocked)
 
   return (
-    <div className={`
-      bg-slate-800/30 rounded-xl p-4 border transition-all
-      ${canCraft ? 'border-[--neon-blue]/50 hover:border-[--neon-blue]' : 'border-slate-700/30 opacity-60'}
-    `}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{wafer.emoji}</span>
-          <div>
-            <div className="font-medium text-white">{wafer.name}</div>
-            <div className="text-xs text-slate-400">
-              Owned: {safeToNumber(waferState.amount).toFixed(0)}
+    <Card className="bg-card/50">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl flex-shrink-0">{wafer.emoji}</span>
+            <div className="min-w-0">
+              <div className="font-medium truncate">{wafer.name}</div>
+              <div className="text-xs text-muted-foreground">
+                Owned: {safeToNumber(waferState.amount).toFixed(0)}
+              </div>
             </div>
           </div>
+          <Button
+            size="sm"
+            onClick={() => startCraftWafer(waferId)}
+            disabled={!canCraft}
+            className="flex-shrink-0 w-20"
+          >
+            {crafting && autoFabUnlocked ? 'Queue' : 'Craft'}
+          </Button>
         </div>
-        <button
-          onClick={() => startCraftWafer(waferId)}
-          disabled={!canCraft}
-          className={`
-            px-4 py-2 rounded-lg font-medium text-sm transition-all
-            ${canCraft 
-              ? 'bg-[--neon-blue] text-slate-950 hover:brightness-110 active:scale-95' 
-              : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-            }
-          `}
-        >
-          {crafting && autoFabUnlocked ? 'Queue' : 'Craft'}
-        </button>
-      </div>
-      
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(wafer.recipe).map(([mineralId, cost]) => {
-          const mineral = MINERALS[mineralId as MineralId]
-          const mineralState = minerals?.[mineralId as MineralId]
-          if (!mineral) return null
-          const have = safeToNumber(mineralState?.amount)
-          const enough = have >= cost
-          return (
-            <span
-              key={mineralId}
-              className={`text-xs px-2 py-1 rounded-full ${
-                enough ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}
-            >
-              {mineral.emoji} {formatCost(cost, have)}
-            </span>
-          )
-        })}
-      </div>
-    </div>
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {Object.entries(wafer.recipe).map(([mineralId, cost]) => {
+            const mineral = MINERALS[mineralId as MineralId]
+            const have = safeToNumber(minerals?.[mineralId as MineralId]?.amount)
+            if (!mineral) return null
+            return (
+              <ResourceBadge key={mineralId} emoji={mineral.emoji} have={have} need={cost} />
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -100,129 +86,94 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
   const autoFabUnlocked = useGameStore((s) => s.autoFabUnlocked)
   const startCraftChip = useGameStore((s) => s.startCraftChip)
 
-  // Skip if no chip data
-  if (!chip || !chipState) return null
-  if (!chipState.unlocked) return null
+  if (!chip || !chipState?.unlocked) return null
 
   const hasResources = canCraftChip(chipId, minerals, wafers, currentNode)
   const canCraft = hasResources && (!crafting || autoFabUnlocked)
   const waferState = wafers?.[chip.waferCost?.type]
-  
+  const waferDef = WAFERS[chip.waferCost?.type]
+
   if (!waferState) return null
 
   return (
-    <div className={`
-      bg-slate-800/30 rounded-xl p-4 border transition-all
-      ${canCraft ? 'border-[--neon-purple]/50 hover:border-[--neon-purple]' : 'border-slate-700/30 opacity-60'}
-    `}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{chip.emoji}</span>
-          <div>
-            <div className="font-medium text-white">{chip.name}</div>
-            <div className="text-xs text-slate-400">
-              {chip.node} • Owned: {safeToNumber(chipState.amount).toFixed(0)}
+    <Card className="bg-card/50">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl flex-shrink-0">{chip.emoji}</span>
+            <div className="min-w-0">
+              <div className="font-medium truncate">{chip.name}</div>
+              <div className="text-xs text-muted-foreground">
+                {chip.node} • Owned: {safeToNumber(chipState.amount).toFixed(0)}
+              </div>
             </div>
           </div>
+          <Button
+            size="sm"
+            onClick={() => startCraftChip(chipId)}
+            disabled={!canCraft}
+            className="flex-shrink-0 w-20"
+          >
+            {crafting && autoFabUnlocked ? 'Queue' : 'Fab'}
+          </Button>
         </div>
-        <button
-          onClick={() => startCraftChip(chipId)}
-          disabled={!canCraft}
-          className={`
-            px-4 py-2 rounded-lg font-medium text-sm transition-all
-            ${canCraft 
-              ? 'bg-[--neon-purple] text-white hover:brightness-110 active:scale-95' 
-              : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-            }
-          `}
-        >
-          {crafting && autoFabUnlocked ? 'Queue' : 'Fab'}
-        </button>
-      </div>
-      
-      <p className="text-xs text-slate-500 mb-2 italic">{chip.description}</p>
-      
-      <div className="flex flex-wrap gap-2">
-        {/* Wafer cost */}
-        {(() => {
-          const waferDef = WAFERS[chip.waferCost?.type]
-          const waferAmount = safeToNumber(waferState?.amount)
-          const needed = chip.waferCost?.amount ?? 0
-          const hasEnough = waferAmount >= needed
-          return (
-            <span className={`text-xs px-2 py-1 rounded-full ${
-              hasEnough ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
-            }`}>
-              {waferDef?.emoji ?? '?'} {formatCost(needed, waferAmount)}
-            </span>
-          )
-        })()}
-        
-        {/* Extra mineral costs */}
-        {chip.extraCosts && Object.entries(chip.extraCosts).map(([mineralId, cost]) => {
-          const mineral = MINERALS[mineralId as MineralId]
-          const mineralState = minerals?.[mineralId as MineralId]
-          if (!mineral) return null
-          const have = safeToNumber(mineralState?.amount)
-          return (
-            <span
-              key={mineralId}
-              className={`text-xs px-2 py-1 rounded-full ${
-                have >= cost ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}
-            >
-              {mineral.emoji} {formatCost(cost, have)}
-            </span>
-          )
-        })}
-      </div>
-    </div>
+        <p className="text-xs text-muted-foreground mt-2 italic">{chip.description}</p>
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {/* Wafer cost */}
+          <ResourceBadge 
+            emoji={waferDef?.emoji ?? '?'} 
+            have={safeToNumber(waferState?.amount)} 
+            need={chip.waferCost?.amount ?? 0} 
+          />
+          {/* Extra mineral costs */}
+          {chip.extraCosts && Object.entries(chip.extraCosts).map(([mineralId, cost]) => {
+            const mineral = MINERALS[mineralId as MineralId]
+            const have = safeToNumber(minerals?.[mineralId as MineralId]?.amount)
+            if (!mineral) return null
+            return (
+              <ResourceBadge key={mineralId} emoji={mineral.emoji} have={have} need={cost} />
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 export function FabPanel() {
   const wafers = useGameStore((s) => s.wafers)
   const chips = useGameStore((s) => s.chips)
-  const autoFabUnlocked = useGameStore((s) => s.autoFabUnlocked)
-  const research = useGameStore((s) => s.research)
-  
-  // Safe filtering
+
   const unlockedWafers = WAFER_ORDER.filter(id => wafers?.[id]?.unlocked)
   const unlockedChips = CHIP_ORDER.filter(id => chips?.[id]?.unlocked)
-  
-  // Debug
-  const hasAutoFabResearch = research?.completed?.includes('auto_fab')
 
   return (
     <div className="space-y-6">
-      {/* Debug info - remove later */}
-      <div className="text-xs text-slate-500 bg-slate-800/50 p-2 rounded">
-        🔧 autoFabUnlocked: {autoFabUnlocked ? '✅' : '❌'} | 
-        research.auto_fab: {hasAutoFabResearch ? '✅' : '❌'}
+      {/* Fixed height crafting area so buttons don't move */}
+      <div className="min-h-[100px]">
+        <CraftingProgress />
       </div>
-      
-      <CraftingProgress />
-      
+
       <section>
-        <h2 className="text-lg font-bold text-slate-300 mb-3 flex items-center gap-2">
-          <span>💿</span> Wafers
+        <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+          💿 Wafers
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {unlockedWafers.length === 0 ? (
-            <p className="text-slate-500 text-sm">No wafers unlocked yet</p>
+            <p className="text-muted-foreground text-sm">No wafers unlocked yet</p>
           ) : (
             unlockedWafers.map(id => <WaferCard key={id} waferId={id} />)
           )}
         </div>
       </section>
-      
+
       <section>
-        <h2 className="text-lg font-bold text-slate-300 mb-3 flex items-center gap-2">
-          <span>🔲</span> Chips
+        <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+          🔲 Chips
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {unlockedChips.length === 0 ? (
-            <p className="text-slate-500 text-sm">No chips unlocked yet</p>
+            <p className="text-muted-foreground text-sm">No chips unlocked yet</p>
           ) : (
             unlockedChips.map(id => <ChipCard key={id} chipId={id} />)
           )}
