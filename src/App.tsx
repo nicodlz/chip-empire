@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useGameStore, startTicker } from './store/gameStore'
-import { useHydrated } from './store/useHydrated'
 import { MineralDisplay } from './components/MineralDisplay'
 import { MineArea } from './components/MineArea'
 import { TabNav } from './components/TabNav'
@@ -39,32 +38,17 @@ function FlopsCounter() {
   )
 }
 
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-4xl mb-4">⚡</div>
-        <div className="text-xl font-bold tracking-wider text-[--neon-blue]">CHIP EMPIRE</div>
-        <div className="text-sm text-slate-400 mt-2">Loading...</div>
-      </div>
-    </div>
-  )
-}
-
-function Game() {
+export default function App() {
   const activeTab = useGameStore((s) => s.activeTab)
   
-  // Start the game ticker
   useEffect(() => {
     startTicker()
   }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col">
-      {/* Offline Progress Modal */}
       <OfflineModal />
       
-      {/* Header */}
       <header className="p-4 border-b border-slate-800/50 backdrop-blur-sm sticky top-0 z-10 bg-slate-950/80">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <h1 className="text-xl font-bold tracking-wider">
@@ -74,12 +58,10 @@ function Game() {
         </div>
       </header>
 
-      {/* Tab Navigation */}
       <div className="p-4 max-w-lg mx-auto w-full">
         <TabNav />
       </div>
 
-      {/* Main content */}
       <main className="flex-1 flex flex-col p-4 gap-6 max-w-lg mx-auto w-full pb-20">
         {activeTab === 'mine' && <MineTab />}
         {activeTab === 'fab' && <FabPanel />}
@@ -88,20 +70,9 @@ function Game() {
         {activeTab === 'auto' && <AutoPanel />}
       </main>
 
-      {/* Footer */}
       <footer className="p-3 text-center text-slate-600 text-xs border-t border-slate-800/50">
         Mine minerals • Build chips • Unlock research
       </footer>
     </div>
   )
-}
-
-export default function App() {
-  const hydrated = useHydrated()
-  
-  if (!hydrated) {
-    return <LoadingScreen />
-  }
-  
-  return <Game />
 }
