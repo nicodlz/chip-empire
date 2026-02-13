@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useGameStore, startTicker } from './store/gameStore'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { MineralDisplay } from './components/MineralDisplay'
 import { MineArea } from './components/MineArea'
 import { TabNav } from './components/TabNav'
@@ -23,6 +24,8 @@ function FlopsCounter() {
   const totalFlops = useGameStore((s) => s.totalFlops)
   const flopsPerSecond = useGameStore((s) => s.flopsPerSecond)
   
+  // Safety check
+  if (!flopsPerSecond || typeof flopsPerSecond.eq !== 'function') return null
   if (flopsPerSecond.eq(0)) return null
   
   return (
@@ -36,6 +39,17 @@ function FlopsCounter() {
       </div>
     </div>
   )
+}
+
+function TabContent({ tab }: { tab: string }) {
+  switch (tab) {
+    case 'mine': return <MineTab />
+    case 'fab': return <FabPanel />
+    case 'chips': return <ChipsPanel />
+    case 'research': return <ResearchPanel />
+    case 'auto': return <AutoPanel />
+    default: return <MineTab />
+  }
 }
 
 export default function App() {
@@ -59,15 +73,15 @@ export default function App() {
       </header>
 
       <div className="p-4 max-w-lg mx-auto w-full">
-        <TabNav />
+        <ErrorBoundary>
+          <TabNav />
+        </ErrorBoundary>
       </div>
 
       <main className="flex-1 flex flex-col p-4 gap-6 max-w-lg mx-auto w-full pb-20">
-        {activeTab === 'mine' && <MineTab />}
-        {activeTab === 'fab' && <FabPanel />}
-        {activeTab === 'chips' && <ChipsPanel />}
-        {activeTab === 'research' && <ResearchPanel />}
-        {activeTab === 'auto' && <AutoPanel />}
+        <ErrorBoundary>
+          <TabContent tab={activeTab} />
+        </ErrorBoundary>
       </main>
 
       <footer className="p-3 text-center text-slate-600 text-xs border-t border-slate-800/50">

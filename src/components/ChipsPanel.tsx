@@ -3,13 +3,43 @@ import { formatFlops } from '../engine/fabrication'
 import { CHIPS, CHIP_ORDER } from '../data/chips'
 import type { ChipId } from '../types/fabrication'
 
+// Safe Decimal operations
+function safeToNumber(val: unknown): number {
+  if (val && typeof (val as any).toNumber === 'function') {
+    return (val as any).toNumber()
+  }
+  return 0
+}
+
+function safeGt(val: unknown, num: number): boolean {
+  if (val && typeof (val as any).gt === 'function') {
+    return (val as any).gt(num)
+  }
+  return false
+}
+
+function safeEq(val: unknown, num: number): boolean {
+  if (val && typeof (val as any).eq === 'function') {
+    return (val as any).eq(num)
+  }
+  return true
+}
+
+function safeMul(val: unknown, other: unknown): unknown {
+  if (val && typeof (val as any).mul === 'function') {
+    return (val as any).mul(other)
+  }
+  return val
+}
+
 function ChipRow({ chipId }: { chipId: ChipId }) {
   const chip = CHIPS[chipId]
-  const chipState = useGameStore((s) => s.chips[chipId])
+  const chipState = useGameStore((s) => s.chips?.[chipId])
   
-  if (chipState.amount.eq(0)) return null
+  if (!chip || !chipState) return null
+  if (safeEq(chipState.amount, 0)) return null
 
-  const flopsFromThis = chip.flopsPerSecond.mul(chipState.amount)
+  const flopsFromThis = safeMul(chip.flopsPerSecond, chipState.amount)
 
   return (
     <div className="flex items-center justify-between py-3 border-b border-slate-700/30 last:border-0">
@@ -24,10 +54,10 @@ function ChipRow({ chipId }: { chipId: ChipId }) {
       </div>
       <div className="text-right">
         <div className="font-mono text-[--neon-green] text-lg">
-          ×{chipState.amount.toFixed(0)}
+          ×{safeToNumber(chipState.amount).toFixed(0)}
         </div>
         <div className="text-xs text-slate-400">
-          {formatFlops(flopsFromThis)}/s
+          {formatFlops(flopsFromThis as any)}/s
         </div>
       </div>
     </div>
@@ -38,13 +68,12 @@ export function ChipsPanel() {
   const totalFlops = useGameStore((s) => s.totalFlops)
   const flopsPerSecond = useGameStore((s) => s.flopsPerSecond)
   const currentNode = useGameStore((s) => s.currentNode)
-  const ownedChips = useGameStore((s) => 
-    CHIP_ORDER.filter(id => s.chips[id].amount.gt(0))
-  )
+  const chips = useGameStore((s) => s.chips)
+  
+  const ownedChips = CHIP_ORDER.filter(id => safeGt(chips?.[id]?.amount, 0))
 
   return (
     <div className="space-y-6">
-      {/* FLOPS Header */}
       <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 rounded-2xl p-6 border border-slate-700/50">
         <div className="text-center">
           <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
@@ -57,12 +86,11 @@ export function ChipsPanel() {
             +{formatFlops(flopsPerSecond)}/sec
           </div>
           <div className="text-xs text-slate-500 mt-2">
-            Current Node: {currentNode}
+            Current Node: {currentNode || '90nm'}
           </div>
         </div>
       </div>
       
-      {/* Owned Chips */}
       {ownedChips.length > 0 ? (
         <section className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
           <h2 className="text-sm uppercase tracking-wider text-slate-400 mb-3">

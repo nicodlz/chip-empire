@@ -5,8 +5,16 @@ import type { AutoMinerId } from '../types/automation'
 import type { MineralId } from '../types/game'
 import Decimal from 'break_eternity.js'
 
+function safeToNumber(val: unknown): number {
+  if (val && typeof (val as any).toNumber === 'function') {
+    return (val as any).toNumber()
+  }
+  if (typeof val === 'number') return val
+  return 0
+}
+
 function formatNumber(n: Decimal | number): string {
-  const num = n instanceof Decimal ? n.toNumber() : n
+  const num = safeToNumber(n)
   if (num < 1000) return num.toFixed(0)
   if (num < 1e6) return `${(num / 1000).toFixed(1)}K`
   if (num < 1e9) return `${(num / 1e6).toFixed(2)}M`
@@ -16,16 +24,16 @@ function formatNumber(n: Decimal | number): string {
 
 function AutoMinerCard({ minerId }: { minerId: AutoMinerId }) {
   const def = AUTO_MINERS[minerId]
-  const minerState = useGameStore((s) => s.autoMiners[minerId])
+  const minerState = useGameStore((s) => s.autoMiners?.[minerId])
   const canBuy = useGameStore((s) => s.canBuyAutoMiner(minerId))
   const getCost = useGameStore((s) => s.getAutoMinerCost)
   const buyAutoMiner = useGameStore((s) => s.buyAutoMiner)
-  const miningMultiplier = useGameStore((s) => s.miningMultiplier)
+  const miningMultiplier = useGameStore((s) => s.miningMultiplier ?? 1)
   
-  if (!minerState.unlocked) return null
+  if (!def || !minerState?.unlocked) return null
   
   const cost = getCost(minerId)
-  const productionPerSec = def.ratePerSecond * minerState.owned * miningMultiplier
+  const productionPerSec = def.ratePerSecond * (minerState.owned ?? 0) * miningMultiplier
   
   return (
     <div className={`
@@ -41,31 +49,32 @@ function AutoMinerCard({ minerId }: { minerId: AutoMinerId }) {
               Tier {def.tier} • Mines {def.targets.length} minerals
             </div>
             <div className="text-xs text-[--neon-green] mt-1">
-              {minerState.owned > 0 && `+${formatNumber(productionPerSec)}/s each mineral`}
+              {(minerState.owned ?? 0) > 0 && `+${formatNumber(productionPerSec)}/s each mineral`}
             </div>
           </div>
         </div>
         
         <div className="text-right">
           <div className="font-mono text-2xl text-[--neon-blue]">
-            ×{minerState.owned}
+            ×{minerState.owned ?? 0}
           </div>
         </div>
       </div>
       
-      {/* Target minerals preview */}
       <div className="mt-3 flex flex-wrap gap-1">
-        {def.targets.slice(0, 6).map(mineralId => (
-          <span key={mineralId} className="text-sm" title={MINERALS[mineralId].name}>
-            {MINERALS[mineralId].emoji}
-          </span>
-        ))}
+        {def.targets.slice(0, 6).map(mineralId => {
+          const mineral = MINERALS[mineralId]
+          return mineral ? (
+            <span key={mineralId} className="text-sm" title={mineral.name}>
+              {mineral.emoji}
+            </span>
+          ) : null
+        })}
         {def.targets.length > 6 && (
           <span className="text-xs text-slate-500">+{def.targets.length - 6}</span>
         )}
       </div>
       
-      {/* Buy button */}
       <button
         onClick={() => buyAutoMiner(minerId)}
         disabled={!canBuy}
@@ -87,18 +96,20 @@ function AutoMinerCard({ minerId }: { minerId: AutoMinerId }) {
 
 function ProductionOverview() {
   const autoMiners = useGameStore((s) => s.autoMiners)
-  const miningMultiplier = useGameStore((s) => s.miningMultiplier)
+  const miningMultiplier = useGameStore((s) => s.miningMultiplier ?? 1)
   
-  // Calculate total production per mineral
   const production: Record<string, number> = {}
   
-  for (const [minerId, minerState] of Object.entries(autoMiners)) {
-    if (minerState.owned > 0) {
-      const def = AUTO_MINERS[minerId as AutoMinerId]
-      const rate = def.ratePerSecond * minerState.owned * miningMultiplier
-      
-      for (const mineralId of def.targets) {
-        production[mineralId] = (production[mineralId] || 0) + rate
+  if (autoMiners) {
+    for (const [minerId, minerState] of Object.entries(autoMiners)) {
+      if (minerState && (minerState.owned ?? 0) > 0) {
+        const def = AUTO_MINERS[minerId as AutoMinerId]
+        if (!def) continue
+        const rate = def.ratePerSecond * minerState.owned * miningMultiplier
+        
+        for (const mineralId of def.targets) {
+          production[mineralId] = (production[mineralId] || 0) + rate
+        }
       }
     }
   }
@@ -117,12 +128,15 @@ function ProductionOverview() {
     <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
       <h3 className="text-sm font-medium text-slate-400 mb-3">Passive Production</h3>
       <div className="grid grid-cols-3 gap-2">
-        {entries.map(([mineralId, rate]) => (
-          <div key={mineralId} className="text-center">
-            <span className="text-lg">{MINERALS[mineralId as MineralId].emoji}</span>
-            <div className="text-xs text-[--neon-green]">+{formatNumber(rate)}/s</div>
-          </div>
-        ))}
+        {entries.map(([mineralId, rate]) => {
+          const mineral = MINERALS[mineralId as MineralId]
+          return mineral ? (
+            <div key={mineralId} className="text-center">
+              <span className="text-lg">{mineral.emoji}</span>
+              <div className="text-xs text-[--neon-green]">+{formatNumber(rate)}/s</div>
+            </div>
+          ) : null
+        })}
       </div>
     </div>
   )
@@ -130,9 +144,9 @@ function ProductionOverview() {
 
 export function AutoPanel() {
   const autoMiningUnlocked = useGameStore((s) => s.autoMiningUnlocked)
-  const unlockedMiners = useGameStore((s) => 
-    AUTO_MINER_ORDER.filter(id => s.autoMiners[id].unlocked)
-  )
+  const autoMiners = useGameStore((s) => s.autoMiners)
+  
+  const unlockedMiners = AUTO_MINER_ORDER.filter(id => autoMiners?.[id]?.unlocked)
   
   if (!autoMiningUnlocked) {
     return (
@@ -153,9 +167,11 @@ export function AutoPanel() {
           <span>🤖</span> Auto-Miners
         </h2>
         <div className="space-y-3">
-          {unlockedMiners.map(id => (
-            <AutoMinerCard key={id} minerId={id} />
-          ))}
+          {unlockedMiners.length === 0 ? (
+            <p className="text-slate-500 text-sm">No miners unlocked</p>
+          ) : (
+            unlockedMiners.map(id => <AutoMinerCard key={id} minerId={id} />)
+          )}
         </div>
       </section>
       

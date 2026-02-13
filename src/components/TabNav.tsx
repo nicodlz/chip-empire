@@ -8,26 +8,55 @@ const tabs = [
   { id: 'research' as const, label: '🔬 R&D', emoji: '🔬' },
 ]
 
+// Safe Decimal comparison
+function safeGte(val: unknown, num: number): boolean {
+  if (val && typeof (val as any).gte === 'function') {
+    return (val as any).gte(num)
+  }
+  return false
+}
+
+function safeGt(val: unknown, num: number): boolean {
+  if (val && typeof (val as any).gt === 'function') {
+    return (val as any).gt(num)
+  }
+  return false
+}
+
+function safeEq(val: unknown, num: number): boolean {
+  if (val && typeof (val as any).eq === 'function') {
+    return (val as any).eq(num)
+  }
+  return true // Default to "equals zero"
+}
+
+function safeLt(val: unknown, num: number): boolean {
+  if (val && typeof (val as any).lt === 'function') {
+    return (val as any).lt(num)
+  }
+  return true // Default to "less than"
+}
+
 export function TabNav() {
   const activeTab = useGameStore((s) => s.activeTab)
   const setActiveTab = useGameStore((s) => s.setActiveTab)
   const totalFlops = useGameStore((s) => s.totalFlops)
   const autoMiningUnlocked = useGameStore((s) => s.autoMiningUnlocked)
-  const hasChips = useGameStore((s) => 
-    Object.values(s.chips).some(c => c.amount.gt(0))
-  )
-  const hasUnlockedFab = useGameStore((s) => 
-    s.minerals.silicon.total.gte(50)
-  )
+  const chips = useGameStore((s) => s.chips)
+  const minerals = useGameStore((s) => s.minerals)
+  
+  // Safe checks
+  const hasChips = Object.values(chips || {}).some(c => safeGt(c?.amount, 0))
+  const hasUnlockedFab = safeGte(minerals?.silicon?.total, 50)
 
   return (
     <nav className="flex gap-1 p-2 bg-slate-900/50 rounded-xl border border-slate-800/50 overflow-x-auto">
       {tabs.map((tab) => {
         // Progressive unlock
         if (tab.id === 'fab' && !hasUnlockedFab) return null
-        if (tab.id === 'chips' && !hasChips && totalFlops.eq(0)) return null
+        if (tab.id === 'chips' && !hasChips && safeEq(totalFlops, 0)) return null
         if (tab.id === 'auto' && !autoMiningUnlocked) return null
-        if (tab.id === 'research' && totalFlops.lt(1e6)) return null
+        if (tab.id === 'research' && safeLt(totalFlops, 1e6)) return null
 
         const isActive = activeTab === tab.id
         return (

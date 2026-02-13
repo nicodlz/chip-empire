@@ -7,18 +7,30 @@ import { CraftingProgress } from './CraftingProgress'
 import type { WaferId, ChipId } from '../types/fabrication'
 import type { MineralId } from '../types/game'
 
-function formatCost(cost: number, have: number): string {
-  if (have >= cost) return `${cost}`
-  return `${Math.floor(have)}/${cost}`
+// Safe number formatting
+function formatCost(cost: number, have: number | undefined): string {
+  const h = have ?? 0
+  if (h >= cost) return `${cost}`
+  return `${Math.floor(h)}/${cost}`
+}
+
+// Safe Decimal to number
+function safeToNumber(val: unknown): number {
+  if (val && typeof (val as any).toNumber === 'function') {
+    return (val as any).toNumber()
+  }
+  return 0
 }
 
 function WaferCard({ waferId }: { waferId: WaferId }) {
   const wafer = WAFERS[waferId]
   const minerals = useGameStore((s) => s.minerals)
-  const waferState = useGameStore((s) => s.wafers[waferId])
+  const waferState = useGameStore((s) => s.wafers?.[waferId])
   const crafting = useGameStore((s) => s.crafting)
   const startCraftWafer = useGameStore((s) => s.startCraftWafer)
 
+  // Skip if no wafer data
+  if (!wafer || !waferState) return null
   if (!waferState.unlocked) return null
 
   const canCraft = !crafting && canCraftWafer(waferId, minerals)
@@ -34,7 +46,7 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
           <div>
             <div className="font-medium text-white">{wafer.name}</div>
             <div className="text-xs text-slate-400">
-              Owned: {waferState.amount.toFixed(0)}
+              Owned: {safeToNumber(waferState.amount).toFixed(0)}
             </div>
           </div>
         </div>
@@ -53,12 +65,12 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
         </button>
       </div>
       
-      {/* Recipe */}
       <div className="flex flex-wrap gap-2">
         {Object.entries(wafer.recipe).map(([mineralId, cost]) => {
           const mineral = MINERALS[mineralId as MineralId]
-          const mineralState = minerals[mineralId as MineralId]
-          const have = mineralState.amount.toNumber()
+          const mineralState = minerals?.[mineralId as MineralId]
+          if (!mineral) return null
+          const have = safeToNumber(mineralState?.amount)
           const enough = have >= cost
           return (
             <span
@@ -80,15 +92,19 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
   const chip = CHIPS[chipId]
   const minerals = useGameStore((s) => s.minerals)
   const wafers = useGameStore((s) => s.wafers)
-  const chipState = useGameStore((s) => s.chips[chipId])
+  const chipState = useGameStore((s) => s.chips?.[chipId])
   const currentNode = useGameStore((s) => s.currentNode)
   const crafting = useGameStore((s) => s.crafting)
   const startCraftChip = useGameStore((s) => s.startCraftChip)
 
+  // Skip if no chip data
+  if (!chip || !chipState) return null
   if (!chipState.unlocked) return null
 
   const canCraft = !crafting && canCraftChip(chipId, minerals, wafers, currentNode)
-  const waferState = wafers[chip.waferCost.type]
+  const waferState = wafers?.[chip.waferCost?.type]
+  
+  if (!waferState) return null
 
   return (
     <div className={`
@@ -101,7 +117,7 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
           <div>
             <div className="font-medium text-white">{chip.name}</div>
             <div className="text-xs text-slate-400">
-              {chip.node} • Owned: {chipState.amount.toFixed(0)}
+              {chip.node} • Owned: {safeToNumber(chipState.amount).toFixed(0)}
             </div>
           </div>
         </div>
@@ -122,25 +138,28 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
       
       <p className="text-xs text-slate-500 mb-2 italic">{chip.description}</p>
       
-      {/* Costs */}
       <div className="flex flex-wrap gap-2">
         {/* Wafer cost */}
-        <span className={`text-xs px-2 py-1 rounded-full ${
-          waferState.amount.gte(chip.waferCost.amount) 
-            ? 'bg-blue-500/20 text-blue-400' 
-            : 'bg-red-500/20 text-red-400'
-        }`}>
-          {WAFERS[chip.waferCost.type].emoji} {formatCost(
-            chip.waferCost.amount, 
-            waferState.amount.toNumber()
-          )}
-        </span>
+        {(() => {
+          const waferDef = WAFERS[chip.waferCost?.type]
+          const waferAmount = safeToNumber(waferState?.amount)
+          const needed = chip.waferCost?.amount ?? 0
+          const hasEnough = waferAmount >= needed
+          return (
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              hasEnough ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+            }`}>
+              {waferDef?.emoji ?? '?'} {formatCost(needed, waferAmount)}
+            </span>
+          )
+        })()}
         
         {/* Extra mineral costs */}
         {chip.extraCosts && Object.entries(chip.extraCosts).map(([mineralId, cost]) => {
           const mineral = MINERALS[mineralId as MineralId]
-          const mineralState = minerals[mineralId as MineralId]
-          const have = mineralState.amount.toNumber()
+          const mineralState = minerals?.[mineralId as MineralId]
+          if (!mineral) return null
+          const have = safeToNumber(mineralState?.amount)
           return (
             <span
               key={mineralId}
@@ -158,39 +177,40 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
 }
 
 export function FabPanel() {
-  const unlockedWafers = useGameStore((s) => 
-    WAFER_ORDER.filter(id => s.wafers[id].unlocked)
-  )
-  const unlockedChips = useGameStore((s) => 
-    CHIP_ORDER.filter(id => s.chips[id].unlocked)
-  )
+  const wafers = useGameStore((s) => s.wafers)
+  const chips = useGameStore((s) => s.chips)
+  
+  // Safe filtering
+  const unlockedWafers = WAFER_ORDER.filter(id => wafers?.[id]?.unlocked)
+  const unlockedChips = CHIP_ORDER.filter(id => chips?.[id]?.unlocked)
 
   return (
     <div className="space-y-6">
-      {/* Crafting progress */}
       <CraftingProgress />
       
-      {/* Wafers section */}
       <section>
         <h2 className="text-lg font-bold text-slate-300 mb-3 flex items-center gap-2">
           <span>💿</span> Wafers
         </h2>
         <div className="space-y-3">
-          {unlockedWafers.map(id => (
-            <WaferCard key={id} waferId={id} />
-          ))}
+          {unlockedWafers.length === 0 ? (
+            <p className="text-slate-500 text-sm">No wafers unlocked yet</p>
+          ) : (
+            unlockedWafers.map(id => <WaferCard key={id} waferId={id} />)
+          )}
         </div>
       </section>
       
-      {/* Chips section */}
       <section>
         <h2 className="text-lg font-bold text-slate-300 mb-3 flex items-center gap-2">
           <span>🔲</span> Chips
         </h2>
         <div className="space-y-3">
-          {unlockedChips.map(id => (
-            <ChipCard key={id} chipId={id} />
-          ))}
+          {unlockedChips.length === 0 ? (
+            <p className="text-slate-500 text-sm">No chips unlocked yet</p>
+          ) : (
+            unlockedChips.map(id => <ChipCard key={id} chipId={id} />)
+          )}
         </div>
       </section>
     </div>
