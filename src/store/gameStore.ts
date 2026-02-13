@@ -486,26 +486,67 @@ export const useGameStore = create<GameStore>()(
       name: 'chip-empire-save-v4',
       storage: {
         getItem: (name) => {
-          const str = localStorage.getItem(name)
-          if (!str) return null
-          
-          const data = deserialize(str)
-          
-          // Calculate offline progress
-          if (data.state && data.state.lastTick) {
-            const offlineSeconds = (Date.now() - data.state.lastTick) / 1000
-            // Only calculate if offline > 1 minute
-            if (offlineSeconds > 60) {
-              const progress = calculateOfflineProgress(data.state as FullGameState, offlineSeconds)
-              // Only show modal if we gained something
-              if (progress.flops.gt(0) || Object.keys(progress.minerals).length > 0) {
-                data.state.offlineProgress = progress
+          try {
+            const str = localStorage.getItem(name)
+            if (!str) return null
+            
+            const data = deserialize(str)
+            
+            // Ensure critical Decimal fields exist (migration safety)
+            if (data.state) {
+              const defaults = createInitialState()
+              // Ensure Decimal fields have proper instances
+              if (!data.state.flopsPerSecond || typeof data.state.flopsPerSecond.mul !== 'function') {
+                data.state.flopsPerSecond = new Decimal(data.state.flopsPerSecond || 0)
               }
-              data.state.lastTick = Date.now()
+              if (!data.state.totalFlops || typeof data.state.totalFlops.add !== 'function') {
+                data.state.totalFlops = new Decimal(data.state.totalFlops || 0)
+              }
+              if (!data.state.miningPower || typeof data.state.miningPower.mul !== 'function') {
+                data.state.miningPower = new Decimal(data.state.miningPower || 1)
+              }
+              // Ensure research state exists
+              if (!data.state.research) {
+                data.state.research = defaults.research
+              }
+              if (!data.state.research.totalSpent || typeof data.state.research.totalSpent.add !== 'function') {
+                data.state.research.totalSpent = new Decimal(data.state.research.totalSpent || 0)
+              }
+              // Ensure autoMiners exist
+              if (!data.state.autoMiners) {
+                data.state.autoMiners = defaults.autoMiners
+              }
+              // Ensure multipliers exist
+              data.state.miningMultiplier = data.state.miningMultiplier ?? 1
+              data.state.fabSpeedMultiplier = data.state.fabSpeedMultiplier ?? 1
+              data.state.flopsMultiplier = data.state.flopsMultiplier ?? 1
+              data.state.autoMiningUnlocked = data.state.autoMiningUnlocked ?? false
             }
+            
+            // Calculate offline progress
+            if (data.state && data.state.lastTick) {
+              const offlineSeconds = (Date.now() - data.state.lastTick) / 1000
+              // Only calculate if offline > 1 minute
+              if (offlineSeconds > 60) {
+                try {
+                  const progress = calculateOfflineProgress(data.state as FullGameState, offlineSeconds)
+                  // Only show modal if we gained something
+                  if (progress.flops.gt(0) || Object.keys(progress.minerals).length > 0) {
+                    data.state.offlineProgress = progress
+                  }
+                } catch (e) {
+                  console.warn('Failed to calculate offline progress:', e)
+                }
+                data.state.lastTick = Date.now()
+              }
+            }
+            
+            return data
+          } catch (e) {
+            console.error('Failed to load save, resetting:', e)
+            localStorage.removeItem(name)
+            return null
           }
-          
-          return data
         },
         setItem: (name, value) => localStorage.setItem(name, serialize(value)),
         removeItem: (name) => localStorage.removeItem(name),
