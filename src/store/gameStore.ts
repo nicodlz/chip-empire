@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { StorageValue } from 'zustand/middleware'
 import Decimal from 'break_eternity.js'
-import { setHydrated } from './useHydrated'
 import type { GameState, MineralId, MineralState } from '../types/game'
 import type { WaferId, ChipId, WaferState, ChipState, FabState } from '../types/fabrication'
 import type { ResearchId, ResearchState } from '../types/research'
@@ -614,12 +613,6 @@ export const useGameStore = create<GameStore>()(
         },
         setItem: (name, value) => localStorage.setItem(name, serialize(value)),
         removeItem: (name) => localStorage.removeItem(name),
-      },
-      onRehydrateStorage: () => {
-        return () => {
-          // Called when rehydration is complete
-          setHydrated()
-        }
       },
     }
   )

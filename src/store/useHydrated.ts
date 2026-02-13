@@ -1,30 +1,26 @@
 /**
  * Hook to track Zustand store hydration status
- * Components can use this to avoid rendering until store is ready
+ * Uses Zustand's built-in persist API
  */
 import { useEffect, useState } from 'react'
-
-let hydrated = false
-const listeners = new Set<() => void>()
-
-export function setHydrated() {
-  hydrated = true
-  listeners.forEach(fn => fn())
-}
+import { useGameStore } from './gameStore'
 
 export function useHydrated(): boolean {
-  const [isHydrated, setIsHydrated] = useState(hydrated)
+  const [hydrated, setHydrated] = useState(false)
   
   useEffect(() => {
-    if (hydrated) {
-      setIsHydrated(true)
-      return
+    // Check if already hydrated
+    const unsubFinishHydration = useGameStore.persist.onFinishHydration(() => {
+      setHydrated(true)
+    })
+    
+    // Also check synchronously in case it already finished
+    if (useGameStore.persist.hasHydrated()) {
+      setHydrated(true)
     }
     
-    const listener = () => setIsHydrated(true)
-    listeners.add(listener)
-    return () => { listeners.delete(listener) }
+    return unsubFinishHydration
   }, [])
   
-  return isHydrated
+  return hydrated
 }
