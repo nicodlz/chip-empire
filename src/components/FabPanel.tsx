@@ -183,13 +183,24 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
 export function FabPanel() {
   const wafers = useGameStore((s) => s.wafers)
   const chips = useGameStore((s) => s.chips)
+  const autoFabUnlocked = useGameStore((s) => s.autoFabUnlocked)
+  const research = useGameStore((s) => s.research)
   
   // Safe filtering
   const unlockedWafers = WAFER_ORDER.filter(id => wafers?.[id]?.unlocked)
   const unlockedChips = CHIP_ORDER.filter(id => chips?.[id]?.unlocked)
+  
+  // Debug
+  const hasAutoFabResearch = research?.completed?.includes('auto_fab')
 
   return (
     <div className="space-y-6">
+      {/* Debug info - remove later */}
+      <div className="text-xs text-slate-500 bg-slate-800/50 p-2 rounded">
+        🔧 autoFabUnlocked: {autoFabUnlocked ? '✅' : '❌'} | 
+        research.auto_fab: {hasAutoFabResearch ? '✅' : '❌'}
+      </div>
+      
       <CraftingProgress />
       
       <section>
