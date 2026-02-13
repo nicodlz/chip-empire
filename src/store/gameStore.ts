@@ -222,13 +222,13 @@ function mergeState(persisted: Partial<FullGameState> | undefined): FullGameStat
     totalSpent: ensureDecimal(persisted.research?.totalSpent),
   }
   
-  // Migration: derive feature flags from completed research
+  // Migration: derive feature flags from completed research (use || to override false values too)
   const completed = research.completed
-  const autoMiningUnlocked = persisted.autoMiningUnlocked ?? completed.includes('auto_miner')
-  const autoFabUnlocked = persisted.autoFabUnlocked ?? completed.includes('auto_fab')
-  const datacenterUnlocked = persisted.datacenterUnlocked ?? completed.includes('datacenter')
-  const quantumUnlocked = persisted.quantumUnlocked ?? completed.includes('quantum_computing')
-  const singularityReached = persisted.singularityReached ?? completed.includes('singularity')
+  const autoMiningUnlocked = persisted.autoMiningUnlocked || completed.includes('auto_miner')
+  const autoFabUnlocked = persisted.autoFabUnlocked || completed.includes('auto_fab')
+  const datacenterUnlocked = persisted.datacenterUnlocked || completed.includes('datacenter')
+  const quantumUnlocked = persisted.quantumUnlocked || completed.includes('quantum_computing')
+  const singularityReached = persisted.singularityReached || completed.includes('singularity')
   
   return {
     minerals,
