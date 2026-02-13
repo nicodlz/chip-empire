@@ -7,35 +7,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import type { QueuedCraft } from '@/types/fabrication'
 
 function getItemDef(type: 'wafer' | 'chip', itemId: string) {
   return type === 'wafer'
     ? WAFERS[itemId as keyof typeof WAFERS]
     : CHIPS[itemId as keyof typeof CHIPS]
-}
-
-function QueueItem({ item, onCancel }: { item: QueuedCraft; onCancel: () => void }) {
-  const def = getItemDef(item.type, item.itemId)
-  if (!def) return null
-
-  return (
-    <div className="flex items-center justify-between py-1.5 px-2 bg-muted/50 rounded">
-      <div className="flex items-center gap-2">
-        <span className="text-base">{def.emoji}</span>
-        <span className="text-sm">
-          {def.name}
-          {item.amount > 1 && <span className="text-muted-foreground"> ×{item.amount}</span>}
-        </span>
-        <Badge variant="outline" className="text-[10px] px-1.5">
-          {(item.duration / 1000).toFixed(1)}s
-        </Badge>
-      </div>
-      <Button variant="ghost" size="sm" onClick={onCancel} className="h-6 w-6 p-0 text-destructive">
-        ✕
-      </Button>
-    </div>
-  )
 }
 
 export function CraftingProgress() {
