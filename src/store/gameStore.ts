@@ -222,6 +222,14 @@ function mergeState(persisted: Partial<FullGameState> | undefined): FullGameStat
     totalSpent: ensureDecimal(persisted.research?.totalSpent),
   }
   
+  // Migration: derive feature flags from completed research
+  const completed = research.completed
+  const autoMiningUnlocked = persisted.autoMiningUnlocked ?? completed.includes('auto_miner')
+  const autoFabUnlocked = persisted.autoFabUnlocked ?? completed.includes('auto_fab')
+  const datacenterUnlocked = persisted.datacenterUnlocked ?? completed.includes('datacenter')
+  const quantumUnlocked = persisted.quantumUnlocked ?? completed.includes('quantum_computing')
+  const singularityReached = persisted.singularityReached ?? completed.includes('singularity')
+  
   return {
     minerals,
     wafers,
@@ -238,11 +246,11 @@ function mergeState(persisted: Partial<FullGameState> | undefined): FullGameStat
     miningMultiplier: persisted.miningMultiplier ?? 1,
     fabSpeedMultiplier: persisted.fabSpeedMultiplier ?? 1,
     flopsMultiplier: persisted.flopsMultiplier ?? 1,
-    autoMiningUnlocked: persisted.autoMiningUnlocked ?? false,
-    autoFabUnlocked: persisted.autoFabUnlocked ?? false,
-    datacenterUnlocked: persisted.datacenterUnlocked ?? false,
-    quantumUnlocked: persisted.quantumUnlocked ?? false,
-    singularityReached: persisted.singularityReached ?? false,
+    autoMiningUnlocked,
+    autoFabUnlocked,
+    datacenterUnlocked,
+    quantumUnlocked,
+    singularityReached,
     craftingQueue: persisted.craftingQueue ?? [],
     offlineProgress: persisted.offlineProgress ?? null,
     activeTab: persisted.activeTab ?? 'mine',
