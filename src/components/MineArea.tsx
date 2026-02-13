@@ -1,17 +1,24 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { TapFeedback } from './TapFeedback'
 import type { TapData } from './TapFeedback'
 import { mineMineral } from '../engine/resources'
-import { MINERALS, TIER_1_MINERALS } from '../data/minerals'
+import { MINERALS, MINERAL_ORDER } from '../data/minerals'
 import type { MineralId } from '../types/game'
 
 export function MineArea() {
   const mine = useGameStore(s => s.mine)
   const miningPower = useGameStore(s => s.miningPower)
+  const minerals = useGameStore(s => s.minerals)
   const [taps, setTaps] = useState<TapData[]>([])
   const [tapId, setTapId] = useState(0)
   const [currentMineral, setCurrentMineral] = useState<MineralId>('silicon')
+  
+  // Get all unlocked minerals in order
+  const unlockedMinerals = useMemo(() => 
+    MINERAL_ORDER.filter(id => minerals[id]?.unlocked),
+    [minerals]
+  )
 
   const handleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
@@ -37,19 +44,20 @@ export function MineArea() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center w-full">
       {/* Mineral selector */}
-      <div className="flex gap-2 mb-6">
-        {TIER_1_MINERALS.map(id => {
+      <div className="flex flex-wrap gap-2 mb-6 justify-center max-w-md">
+        {unlockedMinerals.map(id => {
           const def = MINERALS[id]
           const isActive = currentMineral === id
           return (
             <button
               key={id}
               onClick={() => setCurrentMineral(id)}
-              className={`px-4 py-3 rounded-xl text-2xl transition-all ${
+              className={`px-3 py-2 rounded-xl text-xl transition-all ${
                 isActive 
                   ? 'bg-slate-700 ring-2 ring-[--neon-blue] scale-110' 
                   : 'bg-slate-800/50 hover:bg-slate-700/50 active:scale-95'
               }`}
+              title={def.name}
             >
               {def.emoji}
             </button>
