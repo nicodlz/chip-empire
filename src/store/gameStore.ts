@@ -521,6 +521,51 @@ export const useGameStore = create<GameStore>()(
               data.state.fabSpeedMultiplier = data.state.fabSpeedMultiplier ?? 1
               data.state.flopsMultiplier = data.state.flopsMultiplier ?? 1
               data.state.autoMiningUnlocked = data.state.autoMiningUnlocked ?? false
+              
+              // Ensure wafers exist with proper Decimal amounts
+              if (!data.state.wafers) {
+                data.state.wafers = defaults.wafers
+              } else {
+                for (const waferId of WAFER_ORDER) {
+                  if (!data.state.wafers[waferId]) {
+                    data.state.wafers[waferId] = defaults.wafers[waferId]
+                  } else if (!data.state.wafers[waferId].amount || typeof data.state.wafers[waferId].amount.add !== 'function') {
+                    data.state.wafers[waferId].amount = new Decimal(data.state.wafers[waferId].amount || 0)
+                  }
+                }
+              }
+              
+              // Ensure chips exist with proper Decimal amounts
+              if (!data.state.chips) {
+                data.state.chips = defaults.chips
+              } else {
+                for (const chipId of CHIP_ORDER) {
+                  if (!data.state.chips[chipId]) {
+                    data.state.chips[chipId] = defaults.chips[chipId]
+                  } else if (!data.state.chips[chipId].amount || typeof data.state.chips[chipId].amount.add !== 'function') {
+                    data.state.chips[chipId].amount = new Decimal(data.state.chips[chipId].amount || 0)
+                  }
+                }
+              }
+              
+              // Ensure minerals exist with proper Decimal amounts
+              if (!data.state.minerals) {
+                data.state.minerals = defaults.minerals
+              } else {
+                for (const mineralId of MINERAL_ORDER) {
+                  if (!data.state.minerals[mineralId]) {
+                    data.state.minerals[mineralId] = defaults.minerals[mineralId]
+                  } else {
+                    const m = data.state.minerals[mineralId]
+                    if (!m.amount || typeof m.amount.add !== 'function') {
+                      m.amount = new Decimal(m.amount || 0)
+                    }
+                    if (!m.total || typeof m.total.add !== 'function') {
+                      m.total = new Decimal(m.total || 0)
+                    }
+                  }
+                }
+              }
             }
             
             // Calculate offline progress
