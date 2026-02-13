@@ -2,12 +2,11 @@ import { useGameStore } from '../store/gameStore'
 import { AUTO_MINERS, AUTO_MINER_ORDER } from '../data/automations'
 import { MINERALS } from '../data/minerals'
 import type { AutoMinerId } from '../types/automation'
+import type { MineralId } from '../types/game'
 import Decimal from 'break_eternity.js'
 
-function formatNumber(n: Decimal | number | null | undefined): string {
-  if (n == null) return '0'
+function formatNumber(n: Decimal | number): string {
   const num = n instanceof Decimal ? n.toNumber() : n
-  if (isNaN(num)) return '0'
   if (num < 1000) return num.toFixed(0)
   if (num < 1e6) return `${(num / 1000).toFixed(1)}K`
   if (num < 1e9) return `${(num / 1e6).toFixed(2)}M`
@@ -23,7 +22,7 @@ function AutoMinerCard({ minerId }: { minerId: AutoMinerId }) {
   const buyAutoMiner = useGameStore((s) => s.buyAutoMiner)
   const miningMultiplier = useGameStore((s) => s.miningMultiplier)
   
-  if (!minerState?.unlocked) return null
+  if (!minerState.unlocked) return null
   
   const cost = getCost(minerId)
   const productionPerSec = def.ratePerSecond * minerState.owned * miningMultiplier
@@ -120,7 +119,7 @@ function ProductionOverview() {
       <div className="grid grid-cols-3 gap-2">
         {entries.map(([mineralId, rate]) => (
           <div key={mineralId} className="text-center">
-            <span className="text-lg">{MINERALS[mineralId as keyof typeof MINERALS].emoji}</span>
+            <span className="text-lg">{MINERALS[mineralId as MineralId].emoji}</span>
             <div className="text-xs text-[--neon-green]">+{formatNumber(rate)}/s</div>
           </div>
         ))}

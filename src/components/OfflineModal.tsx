@@ -11,10 +11,8 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 86400)} days`
 }
 
-function formatNumber(n: Decimal | null | undefined): string {
-  if (!n || typeof n.toNumber !== 'function') return '0'
+function formatNumber(n: Decimal): string {
   const num = n.toNumber()
-  if (isNaN(num)) return '0'
   if (num < 1000) return num.toFixed(0)
   if (num < 1e6) return `${(num / 1000).toFixed(1)}K`
   if (num < 1e9) return `${(num / 1e6).toFixed(2)}M`
@@ -57,16 +55,12 @@ export function OfflineModal() {
             <div className="bg-slate-800/50 rounded-xl p-4">
               <div className="text-sm text-slate-400 mb-2 text-center">Minerals Mined</div>
               <div className="grid grid-cols-3 gap-2">
-                {mineralEntries.map(([mineralId, amount]) => {
-                  const mineral = MINERALS[mineralId]
-                  if (!mineral) return null
-                  return (
-                    <div key={mineralId} className="text-center">
-                      <span className="text-lg">{mineral.emoji}</span>
-                      <div className="text-xs text-[--neon-blue]">+{formatNumber(amount)}</div>
-                    </div>
-                  )
-                })}
+                {mineralEntries.map(([mineralId, amount]) => (
+                  <div key={mineralId} className="text-center">
+                    <span className="text-lg">{MINERALS[mineralId].emoji}</span>
+                    <div className="text-xs text-[--neon-blue]">+{formatNumber(amount)}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -28,11 +28,7 @@ export function CraftingProgress() {
     ? WAFERS[crafting.itemId as keyof typeof WAFERS]
     : CHIPS[crafting.itemId as keyof typeof CHIPS]
   
-  // Safety check for corrupted crafting state
-  if (!item) {
-    console.error('Invalid crafting item:', crafting.itemId)
-    return null
-  }
+  if (!item) return null
   
   const remainingMs = Math.max(0, (crafting.startedAt + crafting.duration) - Date.now())
   const remainingSec = (remainingMs / 1000).toFixed(1)

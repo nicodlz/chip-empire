@@ -14,10 +14,10 @@ export function TabNav() {
   const totalFlops = useGameStore((s) => s.totalFlops)
   const autoMiningUnlocked = useGameStore((s) => s.autoMiningUnlocked)
   const hasChips = useGameStore((s) => 
-    Object.values(s.chips).some(c => c?.amount?.gt?.(0))
+    Object.values(s.chips).some(c => c.amount.gt(0))
   )
   const hasUnlockedFab = useGameStore((s) => 
-    s.minerals?.silicon?.total?.gte?.(50) ?? false
+    s.minerals.silicon.total.gte(50)
   )
 
   return (
@@ -25,9 +25,9 @@ export function TabNav() {
       {tabs.map((tab) => {
         // Progressive unlock
         if (tab.id === 'fab' && !hasUnlockedFab) return null
-        if (tab.id === 'chips' && !hasChips && (!totalFlops?.eq || totalFlops.eq(0))) return null
+        if (tab.id === 'chips' && !hasChips && totalFlops.eq(0)) return null
         if (tab.id === 'auto' && !autoMiningUnlocked) return null
-        if (tab.id === 'research' && (!totalFlops?.lt || totalFlops.lt(1e6))) return null
+        if (tab.id === 'research' && totalFlops.lt(1e6)) return null
 
         const isActive = activeTab === tab.id
         return (

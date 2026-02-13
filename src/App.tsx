@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useGameStore, startTicker } from './store/gameStore'
+import { useHydrated } from './store/useHydrated'
 import { MineralDisplay } from './components/MineralDisplay'
 import { MineArea } from './components/MineArea'
 import { TabNav } from './components/TabNav'
@@ -23,9 +24,7 @@ function FlopsCounter() {
   const totalFlops = useGameStore((s) => s.totalFlops)
   const flopsPerSecond = useGameStore((s) => s.flopsPerSecond)
   
-  // Safe check - flopsPerSecond might not be a Decimal during hydration
-  if (!flopsPerSecond?.eq || flopsPerSecond.eq(0)) return null
-  if (!totalFlops?.toString) return null
+  if (flopsPerSecond.eq(0)) return null
   
   return (
     <div className="text-center py-2 px-4 bg-slate-900/50 rounded-lg border border-slate-800/30">
@@ -40,7 +39,19 @@ function FlopsCounter() {
   )
 }
 
-export default function App() {
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-4xl mb-4">⚡</div>
+        <div className="text-xl font-bold tracking-wider text-[--neon-blue]">CHIP EMPIRE</div>
+        <div className="text-sm text-slate-400 mt-2">Loading...</div>
+      </div>
+    </div>
+  )
+}
+
+function Game() {
   const activeTab = useGameStore((s) => s.activeTab)
   
   // Start the game ticker
@@ -83,4 +94,14 @@ export default function App() {
       </footer>
     </div>
   )
+}
+
+export default function App() {
+  const hydrated = useHydrated()
+  
+  if (!hydrated) {
+    return <LoadingScreen />
+  }
+  
+  return <Game />
 }
