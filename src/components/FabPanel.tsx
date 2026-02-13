@@ -16,11 +16,11 @@ function formatCost(cost: number, have: number): string {
 function WaferCard({ waferId }: { waferId: WaferId }) {
   const wafer = WAFERS[waferId]
   const minerals = useGameStore((s) => s.minerals)
-  const waferState = useGameStore((s) => s.wafers[waferId])
+  const waferState = useGameStore((s) => s.wafers?.[waferId])
   const crafting = useGameStore((s) => s.crafting)
   const startCraftWafer = useGameStore((s) => s.startCraftWafer)
 
-  if (!waferState.unlocked) return null
+  if (!wafer || !waferState?.unlocked) return null
 
   const canCraft = !crafting && canCraftWafer(waferId, minerals)
 
@@ -35,7 +35,7 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
           <div>
             <div className="font-medium text-white">{wafer.name}</div>
             <div className="text-xs text-slate-400">
-              Owned: {waferState.amount.toFixed(0)}
+              Owned: {waferState.amount?.toFixed?.(0) ?? 0}
             </div>
           </div>
         </div>
@@ -82,12 +82,12 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
   const chip = CHIPS[chipId]
   const minerals = useGameStore((s) => s.minerals)
   const wafers = useGameStore((s) => s.wafers)
-  const chipState = useGameStore((s) => s.chips[chipId])
+  const chipState = useGameStore((s) => s.chips?.[chipId])
   const currentNode = useGameStore((s) => s.currentNode)
   const crafting = useGameStore((s) => s.crafting)
   const startCraftChip = useGameStore((s) => s.startCraftChip)
 
-  if (!chipState?.unlocked) return null
+  if (!chip || !chipState?.unlocked) return null
 
   const canCraft = !crafting && canCraftChip(chipId, minerals, wafers, currentNode)
   const waferState = wafers[chip.waferCost?.type]
@@ -106,7 +106,7 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
           <div>
             <div className="font-medium text-white">{chip.name}</div>
             <div className="text-xs text-slate-400">
-              {chip.node} • Owned: {chipState.amount.toFixed(0)}
+              {chip.node} • Owned: {chipState.amount?.toFixed?.(0) ?? 0}
             </div>
           </div>
         </div>
@@ -165,10 +165,10 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
 
 export function FabPanel() {
   const unlockedWafers = useGameStore((s) => 
-    WAFER_ORDER.filter(id => s.wafers[id].unlocked)
+    WAFER_ORDER.filter(id => s.wafers?.[id]?.unlocked)
   )
   const unlockedChips = useGameStore((s) => 
-    CHIP_ORDER.filter(id => s.chips[id].unlocked)
+    CHIP_ORDER.filter(id => s.chips?.[id]?.unlocked)
   )
 
   return (
