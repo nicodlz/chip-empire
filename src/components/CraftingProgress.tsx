@@ -62,11 +62,9 @@ export function CraftingProgress() {
   // Empty state placeholder to maintain height
   if (!crafting && craftingQueue.length === 0) {
     return (
-      <Card className="bg-muted/30 border-dashed">
-        <CardContent className="p-4 text-center text-muted-foreground text-sm">
-          Select a wafer or chip to craft
-        </CardContent>
-      </Card>
+      <div className="h-full flex items-center justify-center">
+        <p className="text-muted-foreground text-sm">Select a wafer or chip to craft</p>
+      </div>
     )
   }
 
@@ -76,50 +74,49 @@ export function CraftingProgress() {
 
   return (
     <div className="space-y-2">
-      {/* Current crafting */}
+      {/* Current crafting - compact */}
       {crafting && item && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{item.emoji}</span>
-                <div>
-                  <div className="font-medium">
-                    Crafting {item.name}
+        <Card className="bg-card/80">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">{item.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium truncate">
+                    {item.name}
                     {crafting.amount > 1 && <span className="text-muted-foreground"> ×{crafting.amount}</span>}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {remainingSec}s remaining
-                  </div>
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-2">{remainingSec}s</span>
                 </div>
+                <Progress value={progress} className="h-1.5" />
               </div>
-              <Button variant="destructive" size="sm" onClick={cancelCrafting}>
-                Cancel
+              <Button variant="ghost" size="sm" onClick={cancelCrafting} className="h-7 px-2 text-destructive">
+                ✕
               </Button>
             </div>
-            <Progress value={progress} className="h-2" />
           </CardContent>
         </Card>
       )}
 
-      {/* Queue */}
+      {/* Queue - inline compact */}
       {autoFabUnlocked && craftingQueue.length > 0 && (
-        <Card className="bg-muted/30">
-          <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-              📋 Queue ({craftingQueue.length})
-            </div>
-            <div className="space-y-1">
-              {craftingQueue.map((qItem) => (
-                <QueueItem
-                  key={qItem.id}
-                  item={qItem}
-                  onCancel={() => cancelQueueItem(qItem.id)}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2 px-1 overflow-x-auto">
+          <span className="text-xs text-muted-foreground flex-shrink-0">📋 {craftingQueue.length}:</span>
+          {craftingQueue.map((qItem) => {
+            const def = getItemDef(qItem.type, qItem.itemId)
+            if (!def) return null
+            return (
+              <Badge 
+                key={qItem.id} 
+                variant="secondary" 
+                className="flex-shrink-0 gap-1 cursor-pointer hover:bg-destructive/20"
+                onClick={() => cancelQueueItem(qItem.id)}
+              >
+                {def.emoji} {qItem.amount > 1 && `×${qItem.amount}`}
+              </Badge>
+            )
+          })}
+        </div>
       )}
     </div>
   )

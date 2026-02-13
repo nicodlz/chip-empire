@@ -150,7 +150,7 @@ export function FabPanel() {
   return (
     <div className="space-y-6">
       {/* Fixed height crafting area so buttons don't move */}
-      <div className="min-h-[100px]">
+      <div className="h-[120px] overflow-y-auto">
         <CraftingProgress />
       </div>
 
