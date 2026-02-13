@@ -27,13 +27,15 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
   const minerals = useGameStore((s) => s.minerals)
   const waferState = useGameStore((s) => s.wafers?.[waferId])
   const crafting = useGameStore((s) => s.crafting)
+  const autoFabUnlocked = useGameStore((s) => s.autoFabUnlocked)
   const startCraftWafer = useGameStore((s) => s.startCraftWafer)
 
   // Skip if no wafer data
   if (!wafer || !waferState) return null
   if (!waferState.unlocked) return null
 
-  const canCraft = !crafting && canCraftWafer(waferId, minerals)
+  const hasResources = canCraftWafer(waferId, minerals)
+  const canCraft = hasResources && (!crafting || autoFabUnlocked)
 
   return (
     <div className={`
@@ -61,7 +63,7 @@ function WaferCard({ waferId }: { waferId: WaferId }) {
             }
           `}
         >
-          Craft
+          {crafting && autoFabUnlocked ? 'Queue' : 'Craft'}
         </button>
       </div>
       
@@ -95,13 +97,15 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
   const chipState = useGameStore((s) => s.chips?.[chipId])
   const currentNode = useGameStore((s) => s.currentNode)
   const crafting = useGameStore((s) => s.crafting)
+  const autoFabUnlocked = useGameStore((s) => s.autoFabUnlocked)
   const startCraftChip = useGameStore((s) => s.startCraftChip)
 
   // Skip if no chip data
   if (!chip || !chipState) return null
   if (!chipState.unlocked) return null
 
-  const canCraft = !crafting && canCraftChip(chipId, minerals, wafers, currentNode)
+  const hasResources = canCraftChip(chipId, minerals, wafers, currentNode)
+  const canCraft = hasResources && (!crafting || autoFabUnlocked)
   const waferState = wafers?.[chip.waferCost?.type]
   
   if (!waferState) return null
@@ -132,7 +136,7 @@ function ChipCard({ chipId }: { chipId: ChipId }) {
             }
           `}
         >
-          Fab
+          {crafting && autoFabUnlocked ? 'Queue' : 'Fab'}
         </button>
       </div>
       

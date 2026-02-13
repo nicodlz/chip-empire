@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import Decimal from 'break_eternity.js'
 import type { GameState, MineralId, MineralState } from '../types/game'
-import type { WaferId, ChipId, WaferState, ChipState, FabState } from '../types/fabrication'
+import type { WaferId, ChipId, WaferState, ChipState, FabState, QueuedCraft } from '../types/fabrication'
 import type { ResearchId, ResearchState } from '../types/research'
 import type { AutoMinerId, AutoMinerState, OfflineProgress } from '../types/automation'
 import { createMineralState, addMineral, mineMineral } from '../engine/resources'
@@ -29,6 +29,8 @@ interface FullGameState extends GameState, FabState {
   flopsMultiplier: number
   autoMiners: Record<AutoMinerId, AutoMinerState>
   autoMiningUnlocked: boolean
+  autoFabUnlocked: boolean
+  craftingQueue: QueuedCraft[]
   offlineProgress: OfflineProgress | null
   activeTab: 'mine' | 'fab' | 'chips' | 'research' | 'auto'
 }
@@ -40,6 +42,7 @@ interface GameStore extends FullGameState {
   startCraftChip: (chipId: ChipId, amount?: number) => void
   completeCrafting: () => void
   cancelCrafting: () => void
+  cancelQueueItem: (queueId: string) => void
   buyResearch: (researchId: ResearchId) => void
   canBuyResearch: (researchId: ResearchId) => boolean
   buyAutoMiner: (minerId: AutoMinerId) => void
@@ -74,6 +77,8 @@ const createInitialAutoState = () => ({
     AUTO_MINER_ORDER.map(id => [id, { owned: 0, unlocked: id === 'drill_1' }])
   ) as Record<AutoMinerId, AutoMinerState>,
   autoMiningUnlocked: false,
+  autoFabUnlocked: false,
+  craftingQueue: [] as QueuedCraft[],
 })
 
 const createInitialState = (): FullGameState => ({
@@ -228,6 +233,8 @@ function mergeState(persisted: Partial<FullGameState> | undefined): FullGameStat
     fabSpeedMultiplier: persisted.fabSpeedMultiplier ?? 1,
     flopsMultiplier: persisted.flopsMultiplier ?? 1,
     autoMiningUnlocked: persisted.autoMiningUnlocked ?? false,
+    autoFabUnlocked: persisted.autoFabUnlocked ?? false,
+    craftingQueue: persisted.craftingQueue ?? [],
     offlineProgress: persisted.offlineProgress ?? null,
     activeTab: persisted.activeTab ?? 'mine',
   }
@@ -268,13 +275,30 @@ export const useGameStore = create<GameStore>()(
       }),
 
       startCraftWafer: (waferId, amount = 1) => set((state) => {
-        if (state.crafting) return state
         const wafer = WAFERS[waferId]
         if (!wafer) return state
         if (!canCraftWafer(waferId, state.minerals, amount)) return state
         
         const newMinerals = deductWaferCosts(waferId, state.minerals, amount)
         const adjustedDuration = (wafer.craftTime * amount) / state.fabSpeedMultiplier
+        
+        // If already crafting and auto-fab unlocked, add to queue
+        if (state.crafting && state.autoFabUnlocked) {
+          const queueItem: QueuedCraft = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            type: 'wafer',
+            itemId: waferId,
+            amount,
+            duration: adjustedDuration,
+          }
+          return {
+            minerals: newMinerals as Record<MineralId, MineralState>,
+            craftingQueue: [...state.craftingQueue, queueItem],
+          }
+        }
+        
+        // If already crafting without auto-fab, reject
+        if (state.crafting) return state
         
         return {
           minerals: newMinerals as Record<MineralId, MineralState>,
@@ -289,13 +313,31 @@ export const useGameStore = create<GameStore>()(
       }),
 
       startCraftChip: (chipId, amount = 1) => set((state) => {
-        if (state.crafting) return state
         const chip = CHIPS[chipId]
         if (!chip) return state
         if (!canCraftChip(chipId, state.minerals, state.wafers, state.currentNode, amount)) return state
         
         const { minerals, wafers } = deductChipCosts(chipId, state.minerals, state.wafers, amount)
         const adjustedDuration = (chip.craftTime * amount) / state.fabSpeedMultiplier
+        
+        // If already crafting and auto-fab unlocked, add to queue
+        if (state.crafting && state.autoFabUnlocked) {
+          const queueItem: QueuedCraft = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            type: 'chip',
+            itemId: chipId,
+            amount,
+            duration: adjustedDuration,
+          }
+          return {
+            minerals: minerals as Record<MineralId, MineralState>,
+            wafers,
+            craftingQueue: [...state.craftingQueue, queueItem],
+          }
+        }
+        
+        // If already crafting without auto-fab, reject
+        if (state.crafting) return state
         
         return {
           minerals: minerals as Record<MineralId, MineralState>,
@@ -315,17 +357,33 @@ export const useGameStore = create<GameStore>()(
         
         const { type, itemId, amount } = state.crafting
         
+        // Start next queued item if any
+        let nextCrafting = null
+        let newQueue = state.craftingQueue
+        if (state.craftingQueue.length > 0) {
+          const [next, ...rest] = state.craftingQueue
+          nextCrafting = {
+            type: next.type,
+            itemId: next.itemId,
+            startedAt: Date.now(),
+            duration: next.duration,
+            amount: next.amount,
+          }
+          newQueue = rest
+        }
+        
         if (type === 'wafer') {
           const currentWafer = state.wafers[itemId as WaferId]
-          if (!currentWafer) return { crafting: null }
+          if (!currentWafer) return { crafting: nextCrafting, craftingQueue: newQueue }
           const waferState = addWafer(currentWafer, amount)
           return {
             wafers: { ...state.wafers, [itemId]: waferState },
-            crafting: null,
+            crafting: nextCrafting,
+            craftingQueue: newQueue,
           }
         } else {
           const currentChip = state.chips[itemId as ChipId]
-          if (!currentChip) return { crafting: null }
+          if (!currentChip) return { crafting: nextCrafting, craftingQueue: newQueue }
           const chipState = addChip(currentChip, amount)
           const newChips = { ...state.chips, [itemId]: chipState }
           const nodeDef = PROCESS_NODES[state.currentNode]
@@ -335,12 +393,17 @@ export const useGameStore = create<GameStore>()(
           return {
             chips: newChips,
             flopsPerSecond,
-            crafting: null,
+            crafting: nextCrafting,
+            craftingQueue: newQueue,
           }
         }
       }),
 
       cancelCrafting: () => set({ crafting: null }),
+
+      cancelQueueItem: (queueId) => set((state) => ({
+        craftingQueue: state.craftingQueue.filter(item => item.id !== queueId),
+      })),
 
       canBuyResearch: (researchId) => {
         const state = get()
@@ -442,6 +505,8 @@ export const useGameStore = create<GameStore>()(
             case 'unlock_feature': {
               if (effect.feature === 'auto_miner') {
                 newState = { ...newState, autoMiningUnlocked: true }
+              } else if (effect.feature === 'auto_fab') {
+                newState = { ...newState, autoFabUnlocked: true }
               }
               break
             }

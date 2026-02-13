@@ -81,3 +81,11 @@ export interface CraftingJob {
   duration: number
   amount: number
 }
+
+export interface QueuedCraft {
+  id: string // unique id for removal
+  type: 'wafer' | 'chip'
+  itemId: WaferId | ChipId
+  amount: number
+  duration: number // pre-calculated with fab speed
+}
