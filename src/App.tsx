@@ -23,7 +23,9 @@ function FlopsCounter() {
   const totalFlops = useGameStore((s) => s.totalFlops)
   const flopsPerSecond = useGameStore((s) => s.flopsPerSecond)
   
-  if (flopsPerSecond.eq(0)) return null
+  // Safe check - flopsPerSecond might not be a Decimal during hydration
+  if (!flopsPerSecond?.eq || flopsPerSecond.eq(0)) return null
+  if (!totalFlops?.toString) return null
   
   return (
     <div className="text-center py-2 px-4 bg-slate-900/50 rounded-lg border border-slate-800/30">

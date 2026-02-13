@@ -5,9 +5,10 @@ import type { ChipId } from '../types/fabrication'
 
 function ChipRow({ chipId }: { chipId: ChipId }) {
   const chip = CHIPS[chipId]
-  const chipState = useGameStore((s) => s.chips[chipId])
+  const chipState = useGameStore((s) => s.chips?.[chipId])
   
-  if (chipState.amount.eq(0)) return null
+  if (!chipState?.amount?.eq || chipState.amount.eq(0)) return null
+  if (!chip?.flopsPerSecond) return null
 
   const flopsFromThis = chip.flopsPerSecond.mul(chipState.amount)
 
@@ -39,7 +40,7 @@ export function ChipsPanel() {
   const flopsPerSecond = useGameStore((s) => s.flopsPerSecond)
   const currentNode = useGameStore((s) => s.currentNode)
   const ownedChips = useGameStore((s) => 
-    CHIP_ORDER.filter(id => s.chips[id].amount.gt(0))
+    CHIP_ORDER.filter(id => s.chips?.[id]?.amount?.gt?.(0))
   )
 
   return (
