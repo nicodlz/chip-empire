@@ -5,6 +5,7 @@ import Decimal from 'break_eternity.js'
 import type { GameState, MineralId, MineralState } from '../types/game'
 import type { WaferId, ChipId, WaferState, ChipState, FabState } from '../types/fabrication'
 import type { ResearchId, ResearchState } from '../types/research'
+import type { AutoMinerId, AutoMinerState, OfflineProgress } from '../types/automation'
 import { createMineralState, addMineral, mineMineral } from '../engine/resources'
 import { 
   createWaferState, createChipState, addWafer, addChip,
@@ -16,6 +17,7 @@ import { WAFERS, WAFER_ORDER } from '../data/wafers'
 import { CHIPS, STARTER_CHIPS, CHIP_ORDER } from '../data/chips'
 import { PROCESS_NODES } from '../data/nodes'
 import { RESEARCH } from '../data/research'
+import { AUTO_MINERS, AUTO_MINER_ORDER, getAutoMinerCost } from '../data/automations'
 
 interface FullGameState extends GameState, FabState {
   // Research state
@@ -24,8 +26,13 @@ interface FullGameState extends GameState, FabState {
   miningMultiplier: number
   fabSpeedMultiplier: number
   flopsMultiplier: number
+  // Automation state
+  autoMiners: Record<AutoMinerId, AutoMinerState>
+  autoMiningUnlocked: boolean
+  // Offline progress
+  offlineProgress: OfflineProgress | null
   // Tab state
-  activeTab: 'mine' | 'fab' | 'chips' | 'research'
+  activeTab: 'mine' | 'fab' | 'chips' | 'research' | 'auto'
 }
 
 interface GameStore extends FullGameState {
@@ -42,6 +49,14 @@ interface GameStore extends FullGameState {
   // Research actions
   buyResearch: (researchId: ResearchId) => void
   canBuyResearch: (researchId: ResearchId) => boolean
+  
+  // Automation actions
+  buyAutoMiner: (minerId: AutoMinerId) => void
+  canBuyAutoMiner: (minerId: AutoMinerId) => boolean
+  getAutoMinerCost: (minerId: AutoMinerId) => Decimal
+  
+  // Offline progress
+  dismissOfflineProgress: () => void
   
   // FLOPS generation
   tick: () => void
@@ -67,6 +82,13 @@ const createInitialFabState = (): FabState => ({
   crafting: null,
 })
 
+const createInitialAutoState = () => ({
+  autoMiners: Object.fromEntries(
+    AUTO_MINER_ORDER.map(id => [id, { owned: 0, unlocked: id === 'drill_1' }])
+  ) as Record<AutoMinerId, AutoMinerState>,
+  autoMiningUnlocked: false,
+})
+
 const createInitialState = (): FullGameState => ({
   // Mining state
   minerals: Object.fromEntries(
@@ -90,9 +112,43 @@ const createInitialState = (): FullGameState => ({
   fabSpeedMultiplier: 1,
   flopsMultiplier: 1,
   
+  // Automation state
+  ...createInitialAutoState(),
+  offlineProgress: null,
+  
   // UI state
   activeTab: 'mine',
 })
+
+// Calculate offline progress
+function calculateOfflineProgress(
+  state: FullGameState,
+  offlineSeconds: number
+): OfflineProgress {
+  const minerals: Partial<Record<MineralId, Decimal>> = {}
+  
+  // Auto-miner production
+  if (state.autoMiningUnlocked) {
+    for (const [minerId, minerState] of Object.entries(state.autoMiners)) {
+      if (minerState.owned > 0) {
+        const def = AUTO_MINERS[minerId as AutoMinerId]
+        const production = def.ratePerSecond * minerState.owned * offlineSeconds * state.miningMultiplier
+        
+        for (const mineralId of def.targets) {
+          if (state.minerals[mineralId].unlocked) {
+            const existing = minerals[mineralId] || new Decimal(0)
+            minerals[mineralId] = existing.add(production)
+          }
+        }
+      }
+    }
+  }
+  
+  // FLOPS generation
+  const flops = state.flopsPerSecond.mul(offlineSeconds)
+  
+  return { minerals, flops, duration: offlineSeconds }
+}
 
 // Decimal serialization for localStorage
 const serialize = (state: StorageValue<FullGameState>) => 
@@ -202,18 +258,12 @@ export const useGameStore = create<GameStore>()(
         const state = get()
         const research = RESEARCH[researchId]
         if (!research) return false
-        
-        // Already completed?
         if (state.research.completed.includes(researchId)) return false
-        
-        // Check prerequisites
         if (research.requires) {
           for (const reqId of research.requires) {
             if (!state.research.completed.includes(reqId)) return false
           }
         }
-        
-        // Check cost
         return state.totalFlops.gte(research.cost)
       },
 
@@ -223,18 +273,13 @@ export const useGameStore = create<GameStore>()(
         if (state.research.completed.includes(researchId)) return state
         if (!get().canBuyResearch(researchId)) return state
         
-        // Deduct FLOPS
         const newTotalFlops = state.totalFlops.sub(research.cost)
         const newCompleted = [...state.research.completed, researchId]
         const newTotalSpent = state.research.totalSpent.add(research.cost)
         
-        // Apply effects
         let newState: Partial<FullGameState> = {
           totalFlops: newTotalFlops,
-          research: {
-            completed: newCompleted,
-            totalSpent: newTotalSpent,
-          },
+          research: { completed: newCompleted, totalSpent: newTotalSpent },
         }
         
         for (const effect of research.effects) {
@@ -290,7 +335,6 @@ export const useGameStore = create<GameStore>()(
             }
             case 'flops_multiplier': {
               const newMultiplier = (newState.flopsMultiplier || state.flopsMultiplier) * effect.value
-              // Recalculate FLOPS per second
               const efficiency = PROCESS_NODES[newState.currentNode || state.currentNode].efficiency
               const baseFlops = calculateFlopsPerSecond(newState.chips || state.chips, efficiency)
               newState = {
@@ -300,13 +344,94 @@ export const useGameStore = create<GameStore>()(
               }
               break
             }
+            case 'unlock_feature': {
+              if (effect.feature === 'auto_miner') {
+                newState = { ...newState, autoMiningUnlocked: true }
+              }
+              break
+            }
           }
         }
         
         return newState
       }),
 
-      // === FLOPS GENERATION ===
+      // === AUTOMATION ===
+      canBuyAutoMiner: (minerId) => {
+        const state = get()
+        if (!state.autoMiningUnlocked) return false
+        const minerState = state.autoMiners[minerId]
+        if (!minerState.unlocked) return false
+        
+        const cost = get().getAutoMinerCost(minerId)
+        // Cost is paid in silicon
+        return state.minerals.silicon.amount.gte(cost)
+      },
+
+      getAutoMinerCost: (minerId) => {
+        const state = get()
+        const def = AUTO_MINERS[minerId]
+        return getAutoMinerCost(def, state.autoMiners[minerId].owned)
+      },
+
+      buyAutoMiner: (minerId) => set((state) => {
+        if (!get().canBuyAutoMiner(minerId)) return state
+        
+        const cost = get().getAutoMinerCost(minerId)
+        
+        // Deduct silicon
+        const newSilicon = {
+          ...state.minerals.silicon,
+          amount: state.minerals.silicon.amount.sub(cost),
+        }
+        
+        // Increment owned
+        const newMinerState = {
+          ...state.autoMiners[minerId],
+          owned: state.autoMiners[minerId].owned + 1,
+        }
+        
+        // Unlock next tier if needed
+        const newAutoMiners = { ...state.autoMiners, [minerId]: newMinerState }
+        const tierIndex = AUTO_MINER_ORDER.indexOf(minerId)
+        if (tierIndex < AUTO_MINER_ORDER.length - 1) {
+          const nextTier = AUTO_MINER_ORDER[tierIndex + 1]
+          // Unlock next tier after buying 10 of current
+          if (newMinerState.owned >= 10 && !newAutoMiners[nextTier].unlocked) {
+            newAutoMiners[nextTier] = { ...newAutoMiners[nextTier], unlocked: true }
+          }
+        }
+        
+        return {
+          minerals: { ...state.minerals, silicon: newSilicon },
+          autoMiners: newAutoMiners,
+        }
+      }),
+
+      // === OFFLINE PROGRESS ===
+      dismissOfflineProgress: () => set((state) => {
+        if (!state.offlineProgress) return state
+        
+        // Apply offline minerals
+        const newMinerals = { ...state.minerals }
+        for (const [mineralId, amount] of Object.entries(state.offlineProgress.minerals)) {
+          if (amount && newMinerals[mineralId as MineralId]) {
+            newMinerals[mineralId as MineralId] = {
+              ...newMinerals[mineralId as MineralId],
+              amount: newMinerals[mineralId as MineralId].amount.add(amount),
+              total: newMinerals[mineralId as MineralId].total.add(amount),
+            }
+          }
+        }
+        
+        return {
+          minerals: newMinerals,
+          totalFlops: state.totalFlops.add(state.offlineProgress.flops),
+          offlineProgress: null,
+        }
+      }),
+
+      // === TICK ===
       tick: () => set((state) => {
         const now = Date.now()
         const delta = (now - state.lastTick) / 1000
@@ -319,11 +444,34 @@ export const useGameStore = create<GameStore>()(
           return get()
         }
         
+        // Auto-mining
+        let newMinerals = state.minerals
+        if (state.autoMiningUnlocked) {
+          newMinerals = { ...state.minerals }
+          for (const [minerId, minerState] of Object.entries(state.autoMiners)) {
+            if (minerState.owned > 0) {
+              const def = AUTO_MINERS[minerId as AutoMinerId]
+              const production = def.ratePerSecond * minerState.owned * delta * state.miningMultiplier
+              
+              for (const mineralId of def.targets) {
+                if (newMinerals[mineralId].unlocked) {
+                  newMinerals[mineralId] = {
+                    ...newMinerals[mineralId],
+                    amount: newMinerals[mineralId].amount.add(production),
+                    total: newMinerals[mineralId].total.add(production),
+                  }
+                }
+              }
+            }
+          }
+        }
+        
         // Generate FLOPS
         const flopsGained = state.flopsPerSecond.mul(delta)
         
         return {
           lastTick: now,
+          minerals: newMinerals,
           totalFlops: state.totalFlops.add(flopsGained),
         }
       }),
@@ -335,11 +483,29 @@ export const useGameStore = create<GameStore>()(
       reset: () => set(createInitialState()),
     }),
     {
-      name: 'chip-empire-save-v3',
+      name: 'chip-empire-save-v4',
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name)
-          return str ? deserialize(str) : null
+          if (!str) return null
+          
+          const data = deserialize(str)
+          
+          // Calculate offline progress
+          if (data.state && data.state.lastTick) {
+            const offlineSeconds = (Date.now() - data.state.lastTick) / 1000
+            // Only calculate if offline > 1 minute
+            if (offlineSeconds > 60) {
+              const progress = calculateOfflineProgress(data.state as FullGameState, offlineSeconds)
+              // Only show modal if we gained something
+              if (progress.flops.gt(0) || Object.keys(progress.minerals).length > 0) {
+                data.state.offlineProgress = progress
+              }
+              data.state.lastTick = Date.now()
+            }
+          }
+          
+          return data
         },
         setItem: (name, value) => localStorage.setItem(name, serialize(value)),
         removeItem: (name) => localStorage.removeItem(name),

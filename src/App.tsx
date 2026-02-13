@@ -6,6 +6,8 @@ import { TabNav } from './components/TabNav'
 import { FabPanel } from './components/FabPanel'
 import { ChipsPanel } from './components/ChipsPanel'
 import { ResearchPanel } from './components/ResearchPanel'
+import { AutoPanel } from './components/AutoPanel'
+import { OfflineModal } from './components/OfflineModal'
 import { formatFlops } from './engine/fabrication'
 
 function MineTab() {
@@ -46,6 +48,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col">
+      {/* Offline Progress Modal */}
+      <OfflineModal />
+      
       {/* Header */}
       <header className="p-4 border-b border-slate-800/50 backdrop-blur-sm sticky top-0 z-10 bg-slate-950/80">
         <div className="flex items-center justify-between max-w-lg mx-auto">
@@ -62,11 +67,12 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col p-4 gap-6 max-w-lg mx-auto w-full">
+      <main className="flex-1 flex flex-col p-4 gap-6 max-w-lg mx-auto w-full pb-20">
         {activeTab === 'mine' && <MineTab />}
         {activeTab === 'fab' && <FabPanel />}
         {activeTab === 'chips' && <ChipsPanel />}
         {activeTab === 'research' && <ResearchPanel />}
+        {activeTab === 'auto' && <AutoPanel />}
       </main>
 
       {/* Footer */}

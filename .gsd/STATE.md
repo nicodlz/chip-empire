@@ -5,80 +5,84 @@
 See: .gsd/PROJECT.md (updated 2025-02-12)
 
 **Core value:** La satisfaction de la progression technologique
-**Current focus:** Phase 3 - Compute & Research
+**Current focus:** Phase 4 - Scale (Automation)
 
 ## Current Position
 
-Phase: 2 of 5 (Fabrication) ✓ COMPLETE
-Plan: Fabrication complete
-Status: Ready for Phase 3
-Last activity: 2025-02-12 — Phase 2 executed
+Phase: 3 of 5 (Compute & Research) ✓ COMPLETE
+Plan: Research tree implemented
+Status: Ready for Phase 4
+Last activity: 2025-02-13 00:05 — Phase 3 executed
 
-Progress: [████░░░░░░] 40%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
-**Phase 1:**
-- Plans completed: 3
-- Build: SUCCESS
+**Phase 1:** Foundation ✓
+- Tap mining, minerals, animations
 - Commit: 2997fff
 
-**Phase 2:**
-- Wafers: basic_wafer, refined_wafer, pure_wafer, quantum_wafer
-- Chips: 12 types (CPU/GPU/Memory/ASIC/QPU)
-- Nodes: 90nm → 3nm progression
-- FLOPS: Generation system implemented
-- Build: SUCCESS
+**Phase 2:** Fabrication ✓
+- Wafers, chips, crafting queue
 - Commit: cd1fbb1
+
+**Phase 3:** Research ✓
+- 22 research technologies
+- Categories: Nodes, Efficiency, Automation, Exotic
+- Multipliers: mining, fab speed, FLOPS
+- Progressive unlock via prerequisites
+- Build: SUCCESS
 
 ## Accumulated Context
 
-### Architecture
+### Files
 
 ```
 src/
 ├── types/
-│   ├── game.ts          # MineralId, MineralState, GameState
-│   └── fabrication.ts   # WaferId, ChipId, ProcessNode, FabState
+│   ├── game.ts
+│   ├── fabrication.ts
+│   └── research.ts     # NEW: ResearchId, ResearchDef, ResearchState
 ├── data/
-│   ├── minerals.ts      # 14 minerals (5 tiers)
-│   ├── wafers.ts        # 4 wafer types
-│   ├── chips.ts         # 12 chip types
-│   └── nodes.ts         # 8 process nodes
-├── engine/
-│   ├── resources.ts     # Mining logic
-│   └── fabrication.ts   # Crafting logic, FLOPS calculation
+│   ├── minerals.ts
+│   ├── wafers.ts
+│   ├── chips.ts
+│   ├── nodes.ts
+│   └── research.ts     # NEW: 22 research definitions
 ├── store/
-│   └── gameStore.ts     # Zustand store (v2 with fab state)
+│   └── gameStore.ts    # v3 with research state + multipliers
 └── components/
-    ├── TabNav.tsx       # Navigation tabs
-    ├── MineArea.tsx     # Tap mining
-    ├── MineralDisplay.tsx
-    ├── FabPanel.tsx     # Wafer/chip crafting UI
-    ├── ChipsPanel.tsx   # Inventory + FLOPS display
-    └── CraftingProgress.tsx
+    ├── ResearchPanel.tsx  # NEW: Research UI
+    └── ...
 ```
 
-### Decisions
+### Research Tree
 
-- Stack: React 19 + Vite 7 + Zustand 5 + Tailwind 4
-- 14 real minerals (Si, Cu, Al, Au, Li, Co, Nd, Hf...)
-- Tier system 1-5 for progression
-- Neon accents on dark theme
-- Mobile-first touch handling
-- FLOPS = universal currency for research
-- Process nodes unlock progressively with FLOPS
+**Efficiency (7)**
+- mining_2x → mining_5x
+- fab_speed_2x → fab_speed_5x
+- flops_mult_2x → flops_mult_5x → flops_mult_10x
+
+**Exotic (6)**
+- tier2_minerals → tier3_minerals → tier4_minerals → tier5_minerals
+- quantum_computing → singularity
+
+**Nodes (7)**
+- 90nm (start) → 65nm → 45nm → 28nm → 14nm → 7nm → 5nm → 3nm
+
+**Automation (3)**
+- auto_miner → auto_fab → datacenter
 
 ### Next Phase
 
-Phase 3: Compute & Research
-- Research tree UI
-- Spend FLOPS to unlock research
-- Research unlocks: new nodes, minerals, efficiency
-- Node upgrade system
-- Better FLOPS visualization
+Phase 4: Scale
+- Auto-miners (passive resource generation)
+- Auto-fab (crafting queues)
+- Datacenters (massive passive FLOPS)
+- Offline progress
+- Achievements
 
 ## Session Continuity
 
-Last session: 2025-02-12 23:58
-Stopped at: Phase 2 complete, ready for Phase 3
+Last session: 2025-02-13 00:05
+Stopped at: Phase 3 complete, ready for Phase 4 automation

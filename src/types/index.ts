@@ -7,3 +7,6 @@ export type {
 export type {
   ResearchCategory, ResearchId, ResearchDef, ResearchEffect, ResearchState,
 } from './research'
+export type {
+  AutoMinerId, AutoMinerDef, AutoMinerState, OfflineProgress,
+} from './automation'
