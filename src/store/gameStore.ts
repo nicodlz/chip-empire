@@ -30,6 +30,9 @@ interface FullGameState extends GameState, FabState {
   autoMiners: Record<AutoMinerId, AutoMinerState>
   autoMiningUnlocked: boolean
   autoFabUnlocked: boolean
+  datacenterUnlocked: boolean
+  quantumUnlocked: boolean
+  singularityReached: boolean
   craftingQueue: QueuedCraft[]
   offlineProgress: OfflineProgress | null
   activeTab: 'mine' | 'fab' | 'chips' | 'research' | 'auto'
@@ -78,6 +81,9 @@ const createInitialAutoState = () => ({
   ) as Record<AutoMinerId, AutoMinerState>,
   autoMiningUnlocked: false,
   autoFabUnlocked: false,
+  datacenterUnlocked: false,
+  quantumUnlocked: false,
+  singularityReached: false,
   craftingQueue: [] as QueuedCraft[],
 })
 
@@ -234,6 +240,9 @@ function mergeState(persisted: Partial<FullGameState> | undefined): FullGameStat
     flopsMultiplier: persisted.flopsMultiplier ?? 1,
     autoMiningUnlocked: persisted.autoMiningUnlocked ?? false,
     autoFabUnlocked: persisted.autoFabUnlocked ?? false,
+    datacenterUnlocked: persisted.datacenterUnlocked ?? false,
+    quantumUnlocked: persisted.quantumUnlocked ?? false,
+    singularityReached: persisted.singularityReached ?? false,
     craftingQueue: persisted.craftingQueue ?? [],
     offlineProgress: persisted.offlineProgress ?? null,
     activeTab: persisted.activeTab ?? 'mine',
@@ -507,6 +516,39 @@ export const useGameStore = create<GameStore>()(
                 newState = { ...newState, autoMiningUnlocked: true }
               } else if (effect.feature === 'auto_fab') {
                 newState = { ...newState, autoFabUnlocked: true }
+              } else if (effect.feature === 'datacenter') {
+                // Datacenter: 10x passive FLOPS multiplier
+                const newMultiplier = (newState.flopsMultiplier || state.flopsMultiplier) * 10
+                const currentNode = newState.currentNode || state.currentNode
+                const nodeDef = PROCESS_NODES[currentNode]
+                const efficiency = nodeDef?.efficiency ?? 1
+                const baseFlops = calculateFlopsPerSecond(newState.chips || state.chips, efficiency)
+                newState = {
+                  ...newState,
+                  datacenterUnlocked: true,
+                  flopsMultiplier: newMultiplier,
+                  flopsPerSecond: baseFlops.mul(newMultiplier),
+                }
+              } else if (effect.feature === 'quantum') {
+                // Quantum: unlock QPU early + 5x FLOPS bonus
+                const newChips = { ...(newState.chips || state.chips) }
+                if (newChips.qpu_basic) {
+                  newChips.qpu_basic = { ...newChips.qpu_basic, unlocked: true }
+                }
+                const newMultiplier = (newState.flopsMultiplier || state.flopsMultiplier) * 5
+                const currentNode = newState.currentNode || state.currentNode
+                const nodeDef = PROCESS_NODES[currentNode]
+                const efficiency = nodeDef?.efficiency ?? 1
+                const baseFlops = calculateFlopsPerSecond(newChips, efficiency)
+                newState = {
+                  ...newState,
+                  quantumUnlocked: true,
+                  chips: newChips,
+                  flopsMultiplier: newMultiplier,
+                  flopsPerSecond: baseFlops.mul(newMultiplier),
+                }
+              } else if (effect.feature === 'singularity') {
+                newState = { ...newState, singularityReached: true }
               }
               break
             }
