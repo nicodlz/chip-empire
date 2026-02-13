@@ -20,6 +20,7 @@ export function addMineral(state: MineralState, amount: Decimal): MineralState {
 
 export function mineMineral(mineralId: MineralId, power: Decimal): Decimal {
   const def = MINERALS[mineralId]
+  if (!def) return new Decimal(0)
   return power.times(def.baseRate)
 }
 

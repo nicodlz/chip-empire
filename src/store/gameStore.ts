@@ -128,24 +128,24 @@ function calculateOfflineProgress(
   const minerals: Partial<Record<MineralId, Decimal>> = {}
   
   // Auto-miner production
-  if (state.autoMiningUnlocked) {
+  if (state.autoMiningUnlocked && state.autoMiners) {
     for (const [minerId, minerState] of Object.entries(state.autoMiners)) {
-      if (minerState.owned > 0) {
-        const def = AUTO_MINERS[minerId as AutoMinerId]
-        const production = def.ratePerSecond * minerState.owned * offlineSeconds * state.miningMultiplier
-        
-        for (const mineralId of def.targets) {
-          if (state.minerals[mineralId].unlocked) {
-            const existing = minerals[mineralId] || new Decimal(0)
-            minerals[mineralId] = existing.add(production)
-          }
-        }
+      if (!minerState || minerState.owned <= 0) continue
+      const def = AUTO_MINERS[minerId as AutoMinerId]
+      if (!def) continue
+      const production = def.ratePerSecond * minerState.owned * offlineSeconds * (state.miningMultiplier ?? 1)
+      
+      for (const mineralId of def.targets) {
+        const mineral = state.minerals?.[mineralId]
+        if (!mineral?.unlocked) continue
+        const existing = minerals[mineralId] || new Decimal(0)
+        minerals[mineralId] = existing.add(production)
       }
     }
   }
   
   // FLOPS generation
-  const flops = state.flopsPerSecond.mul(offlineSeconds)
+  const flops = state.flopsPerSecond?.mul?.(offlineSeconds) ?? new Decimal(0)
   
   return { minerals, flops, duration: offlineSeconds }
 }
@@ -164,11 +164,11 @@ export const useGameStore = create<GameStore>()(
 
       // === MINING ===
       mine: (mineralId) => set((state) => {
-        const mineral = state.minerals[mineralId]
-        if (!mineral.unlocked) return state
+        const mineral = state.minerals?.[mineralId]
+        if (!mineral?.unlocked) return state
         
         const baseGain = mineMineral(mineralId, state.miningPower)
-        const gained = baseGain.mul(state.miningMultiplier)
+        const gained = baseGain.mul(state.miningMultiplier ?? 1)
         return {
           minerals: {
             ...state.minerals,
@@ -177,12 +177,16 @@ export const useGameStore = create<GameStore>()(
         }
       }),
 
-      unlockMineral: (mineralId) => set((state) => ({
-        minerals: {
-          ...state.minerals,
-          [mineralId]: { ...state.minerals[mineralId], unlocked: true },
-        },
-      })),
+      unlockMineral: (mineralId) => set((state) => {
+        const mineral = state.minerals?.[mineralId]
+        if (!mineral) return state
+        return {
+          minerals: {
+            ...state.minerals,
+            [mineralId]: { ...mineral, unlocked: true },
+          },
+        }
+      }),
 
       // === FABRICATION ===
       startCraftWafer: (waferId, amount = 1) => set((state) => {
@@ -446,28 +450,28 @@ export const useGameStore = create<GameStore>()(
         
         // Auto-mining
         let newMinerals = state.minerals
-        if (state.autoMiningUnlocked) {
+        if (state.autoMiningUnlocked && state.autoMiners) {
           newMinerals = { ...state.minerals }
           for (const [minerId, minerState] of Object.entries(state.autoMiners)) {
-            if (minerState.owned > 0) {
-              const def = AUTO_MINERS[minerId as AutoMinerId]
-              const production = def.ratePerSecond * minerState.owned * delta * state.miningMultiplier
-              
-              for (const mineralId of def.targets) {
-                if (newMinerals[mineralId].unlocked) {
-                  newMinerals[mineralId] = {
-                    ...newMinerals[mineralId],
-                    amount: newMinerals[mineralId].amount.add(production),
-                    total: newMinerals[mineralId].total.add(production),
-                  }
-                }
+            if (!minerState || minerState.owned <= 0) continue
+            const def = AUTO_MINERS[minerId as AutoMinerId]
+            if (!def) continue
+            const production = def.ratePerSecond * minerState.owned * delta * (state.miningMultiplier ?? 1)
+            
+            for (const mineralId of def.targets) {
+              const mineral = newMinerals[mineralId]
+              if (!mineral?.unlocked || !mineral.amount?.add) continue
+              newMinerals[mineralId] = {
+                ...mineral,
+                amount: mineral.amount.add(production),
+                total: mineral.total.add(production),
               }
             }
           }
         }
         
         // Generate FLOPS
-        const flopsGained = state.flopsPerSecond.mul(delta)
+        const flopsGained = state.flopsPerSecond?.mul?.(delta) ?? new Decimal(0)
         
         return {
           lastTick: now,

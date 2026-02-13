@@ -65,13 +65,17 @@ export function deductWaferCosts(
   amount: number = 1
 ): Record<MineralId, { amount: Decimal }> {
   const wafer = WAFERS[waferId]
+  if (!wafer) return minerals
+  
   const newMinerals = { ...minerals }
 
   for (const [mineralId, cost] of Object.entries(wafer.recipe)) {
     const id = mineralId as MineralId
+    const mineral = newMinerals[id]
+    if (!mineral?.amount?.sub) continue
     newMinerals[id] = {
-      ...newMinerals[id],
-      amount: newMinerals[id].amount.sub(cost * amount),
+      ...mineral,
+      amount: mineral.amount.sub(cost * amount),
     }
   }
 
@@ -86,22 +90,29 @@ export function deductChipCosts(
   amount: number = 1
 ): { minerals: Record<MineralId, { amount: Decimal }>; wafers: Record<WaferId, WaferState> } {
   const chip = CHIPS[chipId]
+  if (!chip) return { minerals, wafers }
+  
   const newMinerals = { ...minerals }
   const newWafers = { ...wafers }
 
   // Deduct wafer
-  newWafers[chip.waferCost.type] = {
-    ...newWafers[chip.waferCost.type],
-    amount: newWafers[chip.waferCost.type].amount.sub(chip.waferCost.amount * amount),
+  const waferState = newWafers[chip.waferCost?.type]
+  if (waferState?.amount?.sub) {
+    newWafers[chip.waferCost.type] = {
+      ...waferState,
+      amount: waferState.amount.sub(chip.waferCost.amount * amount),
+    }
   }
 
   // Deduct extra minerals
   if (chip.extraCosts) {
     for (const [mineralId, cost] of Object.entries(chip.extraCosts)) {
       const id = mineralId as MineralId
+      const mineral = newMinerals[id]
+      if (!mineral?.amount?.sub) continue
       newMinerals[id] = {
-        ...newMinerals[id],
-        amount: newMinerals[id].amount.sub(cost * amount),
+        ...mineral,
+        amount: mineral.amount.sub(cost * amount),
       }
     }
   }
@@ -155,10 +166,10 @@ export function calculateFlopsPerSecond(
   let total = new Decimal(0)
 
   for (const [chipId, state] of Object.entries(chips)) {
-    if (state.amount.gt(0)) {
-      const chip = CHIPS[chipId as ChipId]
-      total = total.add(chip.flopsPerSecond.mul(state.amount).mul(nodeEfficiency))
-    }
+    if (!state?.amount?.gt?.(0)) continue
+    const chip = CHIPS[chipId as ChipId]
+    if (!chip?.flopsPerSecond) continue
+    total = total.add(chip.flopsPerSecond.mul(state.amount).mul(nodeEfficiency))
   }
 
   return total
